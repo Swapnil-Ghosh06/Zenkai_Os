@@ -12,8 +12,8 @@ use crate::gop::{Color, Framebuffer};
 use crate::serial::SerialPort;
 use crate::sync::SpinLock;
 
-const CELL_W: usize = 8;
-const CELL_H: usize = 20;
+const CELL_W: usize = 9;
+const CELL_H: usize = 22;
 
 #[derive(Clone)]
 pub struct ConsoleLine {

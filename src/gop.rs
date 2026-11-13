@@ -17,23 +17,24 @@ impl Color {
         Self { r, g, b }
     }
 
-    // Soft, Calm, Professional Dark Palette (Apple Pro / Linear / Nord inspired)
-    pub const BG_TOP: Self = Self::new(17, 19, 24);         // #111318 Deep Graphite
-    pub const BG_BOTTOM: Self = Self::new(23, 26, 33);      // #171A21 Soft Slate
-    pub const SURFACE: Self = Self::new(27, 30, 38);        // #1B1E26 Window Body
-    pub const SURFACE_ALT: Self = Self::new(33, 37, 47);    // #21252F Titlebar / Dock
-    pub const SURFACE_HOVER: Self = Self::new(42, 48, 62);  // #2A303E Selected Row
-    pub const BORDER: Self = Self::new(46, 51, 64);         // #2E3340 Hairline Border
-    pub const SHADOW: Self = Self::new(9, 10, 14);          // #090A0E Soft Shadow
+    // Modern Linux Distro Palette (Catppuccin / Pop!_OS / Twilight Indigo)
+    pub const BG_TOP: Self = Self::new(15, 20, 35);         // #0F1423 Deep Midnight Indigo
+    pub const BG_BOTTOM: Self = Self::new(26, 34, 56);      // #1A2238 Twilight Slate
+    pub const SURFACE: Self = Self::new(22, 27, 40);        // #161B28 Window Body
+    pub const SURFACE_ALT: Self = Self::new(29, 36, 54);    // #1D2436 Titlebar / Dock
+    pub const SURFACE_HOVER: Self = Self::new(39, 48, 71);  // #273047 Selected Row
+    pub const BORDER: Self = Self::new(46, 56, 82);         // #2E3852 Hairline Border
+    pub const SHADOW: Self = Self::new(7, 10, 18);          // #070A12 Soft Shadow
 
-    pub const TEXT_PRIMARY: Self = Self::new(230, 232, 238);// #E6E8EE Soft Silver-White
-    pub const TEXT_MUTED: Self = Self::new(139, 146, 165);  // #8B92A5 Muted Slate
-    pub const TEXT_DIM: Self = Self::new(92, 99, 118);      // #5C6376 Subtle Caption
+    pub const TEXT_PRIMARY: Self = Self::new(241, 245, 249);// #F1F5F9 Crisp White
+    pub const TEXT_MUTED: Self = Self::new(148, 163, 184);  // #94A3B8 Cool Slate
+    pub const TEXT_DIM: Self = Self::new(100, 116, 139);    // #64748B Subtle Caption
 
-    pub const ACCENT: Self = Self::new(122, 162, 247);      // #7AA2F7 Soft Periwinkle
-    pub const SAGE: Self = Self::new(110, 231, 183);        // #6EE7B7 Soft Sage
-    pub const AMBER: Self = Self::new(252, 211, 77);        // #FCD34D Soft Gold
-    pub const CORAL: Self = Self::new(252, 165, 165);       // #FCA5A5 Soft Coral
+    pub const ACCENT: Self = Self::new(96, 165, 250);       // #60A5FA Sky Blue
+    pub const VIOLET: Self = Self::new(167, 139, 250);      // #A78BFA Soft Violet
+    pub const SAGE: Self = Self::new(52, 211, 153);         // #34D399 Mint Green
+    pub const AMBER: Self = Self::new(251, 191, 36);        // #FBBF24 Soft Gold
+    pub const CORAL: Self = Self::new(248, 113, 113);       // #F87171 Soft Coral
 
     // Compatibility aliases for console macros
     pub const BG_OBSIDIAN: Self = Self::BG_TOP;
@@ -71,18 +72,20 @@ impl Framebuffer {
     #[inline(always)]
     pub fn pack_color(&self, c: Color) -> u32 {
         if self.is_bgr {
-            ((c.b as u32) << 16) | ((c.g as u32) << 8) | (c.r as u32)
-        } else {
+            // Little-endian memory [B, G, R, X] => (R << 16) | (G << 8) | B
             ((c.r as u32) << 16) | ((c.g as u32) << 8) | (c.b as u32)
+        } else {
+            // Little-endian memory [R, G, B, X] => (B << 16) | (G << 8) | R
+            ((c.b as u32) << 16) | ((c.g as u32) << 8) | (c.r as u32)
         }
     }
 
     #[inline(always)]
     pub fn unpack_color(&self, raw: u32) -> Color {
         if self.is_bgr {
-            Color::new((raw & 0xFF) as u8, ((raw >> 8) & 0xFF) as u8, ((raw >> 16) & 0xFF) as u8)
-        } else {
             Color::new(((raw >> 16) & 0xFF) as u8, ((raw >> 8) & 0xFF) as u8, (raw & 0xFF) as u8)
+        } else {
+            Color::new((raw & 0xFF) as u8, ((raw >> 8) & 0xFF) as u8, ((raw >> 16) & 0xFF) as u8)
         }
     }
 
