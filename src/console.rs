@@ -1,4 +1,4 @@
-//! Zenkai OS - Dual Graphical & Serial Console with Bounded Viewport
+//! Zenkai OS - Dual Graphical & Serial Console (Anti-Aliased Menlo)
 //!
 //! Author: Swapnil Ghosh 25BTRCL267 AIML-E
 //! Simultaneous rendering to bounded UEFI Terminal Window and UART COM1 (0x3F8) Serial Port.
@@ -7,10 +7,13 @@ extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::{self, Write};
-use crate::font::{FONT_HEIGHT, FONT_WIDTH};
+use crate::font_aa::TERM_MONO;
 use crate::gop::{Color, Framebuffer};
 use crate::serial::SerialPort;
 use crate::sync::SpinLock;
+
+const CELL_W: usize = 8;
+const CELL_H: usize = 20;
 
 #[derive(Clone)]
 pub struct ConsoleLine {
@@ -37,14 +40,14 @@ impl Console {
     pub const fn new() -> Self {
         Self {
             fb: None,
-            vp_x: 20,
-            vp_y: 20,
-            vp_w: 1240,
-            vp_h: 760,
-            cursor_x: 20,
-            cursor_y: 20,
-            fg: Color::WHITE,
-            bg: Color::BG_PANEL,
+            vp_x: 24,
+            vp_y: 24,
+            vp_w: 1200,
+            vp_h: 720,
+            cursor_x: 24,
+            cursor_y: 24,
+            fg: Color::TEXT_PRIMARY,
+            bg: Color::SURFACE,
             paint_fb: true,
             history: Vec::new(),
             current_line: String::new(),
@@ -52,10 +55,10 @@ impl Console {
     }
 
     pub fn set_framebuffer(&mut self, fb: Framebuffer) {
-        self.vp_x = 20;
-        self.vp_y = 20;
-        self.vp_w = fb.width.saturating_sub(40);
-        self.vp_h = fb.height.saturating_sub(40);
+        self.vp_x = 24;
+        self.vp_y = 24;
+        self.vp_w = fb.width.saturating_sub(48);
+        self.vp_h = fb.height.saturating_sub(48);
         self.cursor_x = self.vp_x;
         self.cursor_y = self.vp_y;
         self.fb = Some(fb);
@@ -87,10 +90,10 @@ impl Console {
     pub fn repaint_viewport(&mut self) {
         if let Some(fb) = &mut self.fb {
             fb.fill_rect(self.vp_x, self.vp_y, self.vp_w, self.vp_h, self.bg);
-            let max_rows = self.vp_h / FONT_HEIGHT;
+            let max_rows = self.vp_h / CELL_H;
             let start = self.history.len().saturating_sub(max_rows.saturating_sub(1));
             let mut cy = self.vp_y;
-            let max_cols = self.vp_w / FONT_WIDTH;
+            let max_cols = self.vp_w / CELL_W;
 
             for line in &self.history[start..] {
                 let mut cx = self.vp_x;
@@ -98,20 +101,17 @@ impl Console {
                     if i >= max_cols {
                         break;
                     }
-                    fb.draw_char(cx, cy, ch, line.color, Some(self.bg), 1);
-                    cx += FONT_WIDTH;
+                    cx += fb.draw_aa_char(cx, cy, &TERM_MONO, ch, line.color, Some(self.bg));
                 }
-                cy += FONT_HEIGHT;
+                cy += CELL_H;
             }
 
-            // Draw current incomplete line (e.g. prompt + typed input)
             let mut cx = self.vp_x;
             for (i, ch) in self.current_line.chars().enumerate() {
                 if i >= max_cols {
                     break;
                 }
-                fb.draw_char(cx, cy, ch, self.fg, Some(self.bg), 1);
-                cx += FONT_WIDTH;
+                cx += fb.draw_aa_char(cx, cy, &TERM_MONO, ch, self.fg, Some(self.bg));
             }
             self.cursor_x = cx;
             self.cursor_y = cy;
@@ -138,7 +138,7 @@ impl Console {
                 text: finished,
                 color: self.fg,
             });
-            if self.history.len() > 80 {
+            if self.history.len() > 100 {
                 self.history.remove(0);
             }
         } else if ch == '\x08' {
@@ -162,28 +162,28 @@ impl Console {
         if let Some(fb) = &mut self.fb {
             if ch == '\n' {
                 self.cursor_x = vp_x;
-                self.cursor_y += FONT_HEIGHT;
+                self.cursor_y += CELL_H;
                 Self::scroll_if_needed(fb, vp_x, vp_y, vp_w, vp_h, &mut self.cursor_y, bg);
                 return;
             } else if ch == '\r' {
                 self.cursor_x = vp_x;
                 return;
             } else if ch == '\x08' {
-                if self.cursor_x >= vp_x + FONT_WIDTH {
-                    self.cursor_x -= FONT_WIDTH;
-                    fb.fill_rect(self.cursor_x, self.cursor_y, FONT_WIDTH, FONT_HEIGHT, bg);
+                if self.cursor_x >= vp_x + CELL_W {
+                    self.cursor_x -= CELL_W;
+                    fb.fill_rect(self.cursor_x, self.cursor_y, CELL_W, CELL_H, bg);
                 }
                 return;
             }
 
-            if self.cursor_x + FONT_WIDTH >= vp_x + vp_w {
+            if self.cursor_x + CELL_W >= vp_x + vp_w {
                 self.cursor_x = vp_x;
-                self.cursor_y += FONT_HEIGHT;
+                self.cursor_y += CELL_H;
                 Self::scroll_if_needed(fb, vp_x, vp_y, vp_w, vp_h, &mut self.cursor_y, bg);
             }
 
-            fb.draw_char(self.cursor_x, self.cursor_y, ch, fg, Some(bg), 1);
-            self.cursor_x += FONT_WIDTH;
+            let adv = fb.draw_aa_char(self.cursor_x, self.cursor_y, &TERM_MONO, ch, fg, Some(bg));
+            self.cursor_x += adv;
         }
     }
 
@@ -196,9 +196,9 @@ impl Console {
         cursor_y: &mut usize,
         bg: Color,
     ) {
-        if *cursor_y + FONT_HEIGHT > vp_y + vp_h {
-            fb.scroll_region(vp_x, vp_y, vp_w, vp_h, FONT_HEIGHT, bg);
-            *cursor_y = cursor_y.saturating_sub(FONT_HEIGHT);
+        if *cursor_y + CELL_H > vp_y + vp_h {
+            fb.scroll_region(vp_x, vp_y, vp_w, vp_h, CELL_H, bg);
+            *cursor_y = cursor_y.saturating_sub(CELL_H);
         }
     }
 
@@ -240,9 +240,9 @@ macro_rules! kprintln {
 macro_rules! kok {
     ($subsys:expr, $($arg:tt)*) => {{
         let mut con = crate::console::GLOBAL_CONSOLE.lock();
-        con.fg = crate::gop::Color::EMERALD;
+        con.fg = crate::gop::Color::SAGE;
         let _ = core::fmt::write(&mut *con, format_args!("[OK   ] [{:<7}] ", $subsys));
-        con.fg = crate::gop::Color::WHITE;
+        con.fg = crate::gop::Color::TEXT_PRIMARY;
         let _ = core::fmt::write(&mut *con, format_args!($($arg)*));
         let _ = core::fmt::write(&mut *con, format_args!("\n"));
     }};
@@ -252,9 +252,9 @@ macro_rules! kok {
 macro_rules! kinfo {
     ($subsys:expr, $($arg:tt)*) => {{
         let mut con = crate::console::GLOBAL_CONSOLE.lock();
-        con.fg = crate::gop::Color::CYAN;
+        con.fg = crate::gop::Color::ACCENT;
         let _ = core::fmt::write(&mut *con, format_args!("[INFO ] [{:<7}] ", $subsys));
-        con.fg = crate::gop::Color::WHITE;
+        con.fg = crate::gop::Color::TEXT_PRIMARY;
         let _ = core::fmt::write(&mut *con, format_args!($($arg)*));
         let _ = core::fmt::write(&mut *con, format_args!("\n"));
     }};
@@ -266,7 +266,7 @@ macro_rules! kwarn {
         let mut con = crate::console::GLOBAL_CONSOLE.lock();
         con.fg = crate::gop::Color::AMBER;
         let _ = core::fmt::write(&mut *con, format_args!("[WARN ] [{:<7}] ", $subsys));
-        con.fg = crate::gop::Color::WHITE;
+        con.fg = crate::gop::Color::TEXT_PRIMARY;
         let _ = core::fmt::write(&mut *con, format_args!($($arg)*));
         let _ = core::fmt::write(&mut *con, format_args!("\n"));
     }};
@@ -276,9 +276,9 @@ macro_rules! kwarn {
 macro_rules! kerror {
     ($subsys:expr, $($arg:tt)*) => {{
         let mut con = crate::console::GLOBAL_CONSOLE.lock();
-        con.fg = crate::gop::Color::CRIMSON;
+        con.fg = crate::gop::Color::CORAL;
         let _ = core::fmt::write(&mut *con, format_args!("[ERROR] [{:<7}] ", $subsys));
-        con.fg = crate::gop::Color::WHITE;
+        con.fg = crate::gop::Color::TEXT_PRIMARY;
         let _ = core::fmt::write(&mut *con, format_args!($($arg)*));
         let _ = core::fmt::write(&mut *con, format_args!("\n"));
     }};

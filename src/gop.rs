@@ -1,9 +1,9 @@
-//! Zenkai OS - UEFI Graphics Output Protocol (GOP) & Framebuffer Driver
+//! Zenkai OS - UEFI Graphics Output Protocol (GOP) & Anti-Aliased Renderer
 //!
 //! Author: Swapnil Ghosh 25BTRCL267 AIML-E
-//! Direct hardware 32-bit linear framebuffer rendering with bounded viewports.
+//! Smooth 32-bit linear framebuffer with alpha-blended typography, rounded surfaces, and gradients.
 
-use crate::font::{get_glyph, FONT_HEIGHT, FONT_WIDTH};
+use crate::font_aa::{AaFace, WORDMARK_COV, WORDMARK_H, WORDMARK_W};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Color {
@@ -17,20 +17,33 @@ impl Color {
         Self { r, g, b }
     }
 
-    // Modern Slate/Indigo Desktop Palette
-    pub const BG_OBSIDIAN: Self = Self::new(11, 16, 27);      // #0B101B Desktop Canvas
-    pub const BG_BAR: Self = Self::new(17, 24, 39);           // #111827 Top Bar & Dock
-    pub const BG_PANEL: Self = Self::new(22, 31, 48);         // #161F30 Window / Panel
-    pub const BG_CARD: Self = Self::new(30, 41, 59);          // #1E293B Elevated Card
-    pub const BG_SELECT: Self = Self::new(37, 56, 84);        // #253854 Selected Row
-    pub const CYAN: Self = Self::new(0, 210, 255);            // #00D2FF Cyber Cyan
-    pub const INDIGO: Self = Self::new(99, 102, 241);         // #6366F1 Accent Indigo
-    pub const EMERALD: Self = Self::new(16, 230, 128);        // #10E680 Status Green
-    pub const AMBER: Self = Self::new(245, 158, 11);          // #F59E0B Warning / Highlight
-    pub const CRIMSON: Self = Self::new(239, 68, 68);         // #EF4444 Error / Fault
-    pub const WHITE: Self = Self::new(241, 245, 249);         // #F1F5F9 Crisp White
-    pub const SLATE: Self = Self::new(148, 163, 184);         // #94A3B8 Muted Text
-    pub const DARK_SLATE: Self = Self::new(51, 65, 85);       // #334155 Borders & Dividers
+    // Soft, Calm, Professional Dark Palette (Apple Pro / Linear / Nord inspired)
+    pub const BG_TOP: Self = Self::new(17, 19, 24);         // #111318 Deep Graphite
+    pub const BG_BOTTOM: Self = Self::new(23, 26, 33);      // #171A21 Soft Slate
+    pub const SURFACE: Self = Self::new(27, 30, 38);        // #1B1E26 Window Body
+    pub const SURFACE_ALT: Self = Self::new(33, 37, 47);    // #21252F Titlebar / Dock
+    pub const SURFACE_HOVER: Self = Self::new(42, 48, 62);  // #2A303E Selected Row
+    pub const BORDER: Self = Self::new(46, 51, 64);         // #2E3340 Hairline Border
+    pub const SHADOW: Self = Self::new(9, 10, 14);          // #090A0E Soft Shadow
+
+    pub const TEXT_PRIMARY: Self = Self::new(230, 232, 238);// #E6E8EE Soft Silver-White
+    pub const TEXT_MUTED: Self = Self::new(139, 146, 165);  // #8B92A5 Muted Slate
+    pub const TEXT_DIM: Self = Self::new(92, 99, 118);      // #5C6376 Subtle Caption
+
+    pub const ACCENT: Self = Self::new(122, 162, 247);      // #7AA2F7 Soft Periwinkle
+    pub const SAGE: Self = Self::new(110, 231, 183);        // #6EE7B7 Soft Sage
+    pub const AMBER: Self = Self::new(252, 211, 77);        // #FCD34D Soft Gold
+    pub const CORAL: Self = Self::new(252, 165, 165);       // #FCA5A5 Soft Coral
+
+    // Compatibility aliases for console macros
+    pub const BG_OBSIDIAN: Self = Self::BG_TOP;
+    pub const BG_PANEL: Self = Self::SURFACE;
+    pub const WHITE: Self = Self::TEXT_PRIMARY;
+    pub const CYAN: Self = Self::ACCENT;
+    pub const EMERALD: Self = Self::SAGE;
+    pub const CRIMSON: Self = Self::CORAL;
+    pub const SLATE: Self = Self::TEXT_MUTED;
+    pub const DARK_SLATE: Self = Self::BORDER;
 }
 
 pub struct Framebuffer {
@@ -45,7 +58,6 @@ unsafe impl Send for Framebuffer {}
 unsafe impl Sync for Framebuffer {}
 
 impl Framebuffer {
-    /// Creates a Framebuffer instance from raw UEFI parameters.
     pub unsafe fn from_raw(base: *mut u32, width: usize, height: usize, stride: usize, is_bgr: bool) -> Self {
         Self {
             base,
@@ -57,12 +69,32 @@ impl Framebuffer {
     }
 
     #[inline(always)]
-    pub fn pack_color(&self, color: Color) -> u32 {
+    pub fn pack_color(&self, c: Color) -> u32 {
         if self.is_bgr {
-            ((color.b as u32) << 16) | ((color.g as u32) << 8) | (color.r as u32)
+            ((c.b as u32) << 16) | ((c.g as u32) << 8) | (c.r as u32)
         } else {
-            ((color.r as u32) << 16) | ((color.g as u32) << 8) | (color.b as u32)
+            ((c.r as u32) << 16) | ((c.g as u32) << 8) | (c.b as u32)
         }
+    }
+
+    #[inline(always)]
+    pub fn unpack_color(&self, raw: u32) -> Color {
+        if self.is_bgr {
+            Color::new((raw & 0xFF) as u8, ((raw >> 8) & 0xFF) as u8, ((raw >> 16) & 0xFF) as u8)
+        } else {
+            Color::new(((raw >> 16) & 0xFF) as u8, ((raw >> 8) & 0xFF) as u8, (raw & 0xFF) as u8)
+        }
+    }
+
+    #[inline(always)]
+    pub fn blend(bg: Color, fg: Color, alpha: u8) -> Color {
+        let a = alpha as u16;
+        let inv = 255 - a;
+        Color::new(
+            ((bg.r as u16 * inv + fg.r as u16 * a) / 255) as u8,
+            ((bg.g as u16 * inv + fg.g as u16 * a) / 255) as u8,
+            ((bg.b as u16 * inv + fg.b as u16 * a) / 255) as u8,
+        )
     }
 
     #[inline(always)]
@@ -75,8 +107,42 @@ impl Framebuffer {
         }
     }
 
+    #[inline(always)]
+    pub fn blend_pixel(&mut self, x: usize, y: usize, fg: Color, alpha: u8) {
+        if alpha == 0 || x >= self.width || y >= self.height {
+            return;
+        }
+        if alpha == 255 {
+            self.set_pixel(x, y, fg);
+            return;
+        }
+        let offset = y * self.stride + x;
+        let raw_bg = unsafe { self.base.add(offset).read_volatile() };
+        let blended = Self::blend(self.unpack_color(raw_bg), fg, alpha);
+        unsafe {
+            self.base.add(offset).write_volatile(self.pack_color(blended));
+        }
+    }
+
     pub fn clear(&mut self, color: Color) {
         self.fill_rect(0, 0, self.width, self.height, color);
+    }
+
+    /// Draws a smooth vertical atmospheric gradient across the whole screen.
+    pub fn fill_gradient(&mut self, top: Color, bottom: Color) {
+        let h = self.height.max(1);
+        for y in 0..self.height {
+            let alpha = ((y * 255) / h) as u8;
+            let row_col = Self::blend(top, bottom, alpha);
+            let packed = self.pack_color(row_col);
+            let row_start = y * self.stride;
+            unsafe {
+                let ptr = self.base.add(row_start);
+                for x in 0..self.width {
+                    ptr.add(x).write_volatile(packed);
+                }
+            }
+        }
     }
 
     pub fn fill_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: Color) {
@@ -106,70 +172,123 @@ impl Framebuffer {
         self.fill_rect(x + w.saturating_sub(thickness), y, thickness, h, color);
     }
 
-    /// Draws a modern card with subtle 2px chamfered corners and 1px border.
-    pub fn draw_card(&mut self, x: usize, y: usize, w: usize, h: usize, fill: Color, border: Color) {
-        if w < 6 || h < 6 {
+    /// Draws a smooth rounded rectangle with circular corners and optional 1px hairline border.
+    pub fn draw_rounded_rect(&mut self, x: usize, y: usize, w: usize, h: usize, r: usize, fill: Color, border: Option<Color>) {
+        if w < r * 2 || h < r * 2 {
+            self.fill_rect(x, y, w, h, fill);
             return;
         }
-        self.fill_rect(x + 2, y, w - 4, h, fill);
-        self.fill_rect(x, y + 2, w, h - 4, fill);
-        // Border edges
-        self.fill_rect(x + 2, y, w - 4, 1, border);
-        self.fill_rect(x + 2, y + h - 1, w - 4, 1, border);
-        self.fill_rect(x, y + 2, 1, h - 4, border);
-        self.fill_rect(x + w - 1, y + 2, 1, h - 4, border);
-        // Corner bevels
-        self.set_pixel(x + 1, y + 1, border);
-        self.set_pixel(x + w - 2, y + 1, border);
-        self.set_pixel(x + 1, y + h - 2, border);
-        self.set_pixel(x + w - 2, y + h - 2, border);
-    }
+        let r_sq = (r * r) as isize;
+        let r_inner_sq = ((r.saturating_sub(1)) * (r.saturating_sub(1))) as isize;
 
-    pub fn draw_char(&mut self, x: usize, y: usize, ch: char, fg: Color, bg: Option<Color>, scale: usize) {
-        let glyph = get_glyph(ch);
-        let packed_fg = self.pack_color(fg);
-        let packed_bg = bg.map(|c| self.pack_color(c));
+        // Fill middle horizontal band
+        self.fill_rect(x, y + r, w, h - 2 * r, fill);
+        // Fill top and bottom center strips
+        self.fill_rect(x + r, y, w - 2 * r, r, fill);
+        self.fill_rect(x + r, y + h - r, w - 2 * r, r, fill);
 
-        for row in 0..FONT_HEIGHT {
-            let bits = glyph[row];
-            for col in 0..FONT_WIDTH {
-                let is_fg = (bits & (0x80 >> col)) != 0;
-                let px_color = if is_fg { Some(packed_fg) } else { packed_bg };
+        if let Some(b) = border {
+            self.fill_rect(x + r, y, w - 2 * r, 1, b);
+            self.fill_rect(x + r, y + h - 1, w - 2 * r, 1, b);
+            self.fill_rect(x, y + r, 1, h - 2 * r, b);
+            self.fill_rect(x + w - 1, y + r, 1, h - 2 * r, b);
+        }
 
-                if let Some(val) = px_color {
-                    for sy in 0..scale {
-                        for sx in 0..scale {
-                            let cx = x + col * scale + sx;
-                            let cy = y + row * scale + sy;
-                            if cx < self.width && cy < self.height {
-                                let offset = cy * self.stride + cx;
-                                unsafe {
-                                    self.base.add(offset).write_volatile(val);
-                                }
-                            }
-                        }
-                    }
+        // Fill 4 rounded corners
+        for dy in 0..r {
+            for dx in 0..r {
+                let dist_sq = ((r - 1 - dx) * (r - 1 - dx) + (r - 1 - dy) * (r - 1 - dy)) as isize;
+                if dist_sq <= r_sq {
+                    let col = if let Some(b) = border {
+                        if dist_sq >= r_inner_sq { b } else { fill }
+                    } else {
+                        fill
+                    };
+                    self.set_pixel(x + dx, y + dy, col);
+                    self.set_pixel(x + w - 1 - dx, y + dy, col);
+                    self.set_pixel(x + dx, y + h - 1 - dy, col);
+                    self.set_pixel(x + w - 1 - dx, y + h - 1 - dy, col);
                 }
             }
         }
     }
 
-    pub fn draw_text(&mut self, x: usize, y: usize, text: &str, fg: Color, bg: Option<Color>, scale: usize) {
-        let mut cur_x = x;
-        let mut cur_y = y;
-
-        for ch in text.chars() {
-            if ch == '\n' {
-                cur_x = x;
-                cur_y += FONT_HEIGHT * scale;
-                continue;
+    /// Draws a soft drop shadow behind a floating rounded window.
+    pub fn draw_shadow(&mut self, x: usize, y: usize, w: usize, h: usize, r: usize) {
+        for layer in (1..=6).rev() {
+            let alpha = (7 - layer) as u8 * 14;
+            let sx = x.saturating_sub(layer / 2);
+            let sy = y + layer * 2;
+            let sw = w + layer;
+            let sh = h + layer;
+            let x_end = (sx + sw).min(self.width);
+            let y_end = (sy + sh).min(self.height);
+            // Fast soft shadow on bottom and right edges
+            for py in (y + h.saturating_sub(r))..y_end {
+                for px in sx..x_end {
+                    self.blend_pixel(px, py, Color::SHADOW, alpha);
+                }
             }
-            self.draw_char(cur_x, cur_y, ch, fg, bg, scale);
-            cur_x += FONT_WIDTH * scale;
         }
     }
 
-    /// Scrolls only a bounded rectangular region `(rx, ry, rw, rh)` upward by `pixel_rows`.
+    /// Renders a single anti-aliased glyph from an AaFace.
+    pub fn draw_aa_char(&mut self, x: usize, y: usize, face: &AaFace, ch: char, fg: Color, bg: Option<Color>) -> usize {
+        let g = face.glyph(ch);
+        let gw = g.width as usize;
+        let gh = g.height as usize;
+        let base = g.offset as usize;
+
+        for row in 0..gh {
+            let cy = y + row;
+            if cy >= self.height {
+                break;
+            }
+            for col in 0..gw {
+                let cx = x + col;
+                if cx >= self.width {
+                    break;
+                }
+                let alpha = face.cov[base + row * gw + col];
+                if let Some(bg_col) = bg {
+                    let blended = Self::blend(bg_col, fg, alpha);
+                    self.set_pixel(cx, cy, blended);
+                } else if alpha > 0 {
+                    self.blend_pixel(cx, cy, fg, alpha);
+                }
+            }
+        }
+        g.advance as usize
+    }
+
+    /// Renders an anti-aliased string using Helvetica Neue / Menlo.
+    pub fn draw_aa_text(&mut self, x: usize, y: usize, face: &AaFace, text: &str, fg: Color, bg: Option<Color>) {
+        let mut cur_x = x;
+        let mut cur_y = y;
+        for ch in text.chars() {
+            if ch == '\n' {
+                cur_x = x;
+                cur_y += face.line_height;
+                continue;
+            }
+            cur_x += self.draw_aa_char(cur_x, cur_y, face, ch, fg, bg);
+        }
+    }
+
+    /// Renders the crisp anti-aliased "Zenkai" wordmark centered horizontally at `top_y`.
+    pub fn draw_wordmark(&mut self, top_y: usize, fg: Color) {
+        let start_x = self.width.saturating_sub(WORDMARK_W) / 2;
+        for row in 0..WORDMARK_H {
+            for col in 0..WORDMARK_W {
+                let alpha = WORDMARK_COV[row * WORDMARK_W + col];
+                if alpha > 0 {
+                    self.blend_pixel(start_x + col, top_y + row, fg, alpha);
+                }
+            }
+        }
+    }
+
+    /// Scrolls a bounded rectangular region upward by `pixel_rows`.
     pub fn scroll_region(&mut self, rx: usize, ry: usize, rw: usize, rh: usize, pixel_rows: usize, fill_color: Color) {
         let rx_end = (rx + rw).min(self.width);
         let ry_end = (ry + rh).min(self.height);
