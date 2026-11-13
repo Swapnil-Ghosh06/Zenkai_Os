@@ -252,7 +252,7 @@ impl Framebuffer {
                 if cx >= self.width {
                     break;
                 }
-                let alpha = face.cov[base + row * gw + col];
+                let alpha = face.cov[base + (gh - 1 - row) * gw + col];
                 if let Some(bg_col) = bg {
                     let blended = Self::blend(bg_col, fg, alpha);
                     self.set_pixel(cx, cy, blended);
@@ -283,7 +283,7 @@ impl Framebuffer {
         let start_x = self.width.saturating_sub(WORDMARK_W) / 2;
         for row in 0..WORDMARK_H {
             for col in 0..WORDMARK_W {
-                let alpha = WORDMARK_COV[row * WORDMARK_W + col];
+                let alpha = WORDMARK_COV[(WORDMARK_H - 1 - row) * WORDMARK_W + col];
                 if alpha > 0 {
                     self.blend_pixel(start_x + col, top_y + row, fg, alpha);
                 }
