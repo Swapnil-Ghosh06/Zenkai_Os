@@ -5,7 +5,7 @@
 //!
 //! Evaluates FIFO, LRU, and Belady's Optimal (OPT) page replacement policies
 //! under four AI/ML access patterns (Sequential, Strided, Bursty, Random)
-//! directly inside the Zenkai-OS kernel, validating Hypotheses H1-H5.
+//! directly inside the Zengi-OS kernel, validating Hypotheses H1-H5.
 
 extern crate alloc;
 use alloc::collections::VecDeque;
@@ -169,7 +169,7 @@ pub fn gen_random(out: &mut [u8], seed: u64) {
 pub fn run_r19_full_benchmark() {
     kinfo!("R19", "================================================================================");
     kinfo!("R19", "         SWAPNIL GHOSH 25BTRCL267 AIML-E: R19 AI/ML RESEARCH ENGINE             ");
-    kinfo!("R19", "                 Zenkai-OS Kernel Verification Module (CA-6)                    ");
+    kinfo!("R19", "                 Zengi-OS Kernel Verification Module (CA-6)                    ");
     kinfo!("R19", "================================================================================");
     kinfo!("R19", "Reference Length: {} | Page Space: {} pages | Test Frames: {:?}",
            REF_LENGTH, PAGE_SPACE, TEST_FRAMES);

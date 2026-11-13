@@ -1,20 +1,46 @@
 [package]
-name = "zenkai_os"
-version = "0.1.0"
-edition = "2021"
+name = "zengi_os"
+version = "0.9.2"
+edition = "2024"
+rust-version = "1.86"
 authors = ["Swapnil Ghosh 25BTRCL267 AIML-E"]
-description = "Zenkai OS - Educational Micro-Kernel for Systems Engineering & AI Memory Research (CA-6)"
+description = "Zengi OS: UEFI x86_64 Educational Micro-Kernel & R19 AI/ML Research Engine"
 
-[dependencies]
-uefi = { version = "0.33.0", features = ["alloc", "logger"] }
-log = "0.4"
+[lib]
+name = "aeon"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zengi_os"
+path = "src/main.rs"
+
+[features]
+fault-ud = []
+fault-pf = []
+fault-stack = []
+fault-wx = []
+fault-nx = []
+fault-panic = []
+dump-eventlog = []
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
 
 [profile.dev]
-opt-level = 1
 panic = "abort"
+opt-level = "s"
+overflow-checks = true
+debug = true
 
 [profile.release]
-opt-level = 3
-lto = true
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
 panic = "abort"
-
+overflow-checks = true
+debug = false
+strip = "debuginfo"

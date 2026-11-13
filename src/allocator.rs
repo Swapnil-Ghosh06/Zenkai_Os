@@ -110,7 +110,7 @@ pub fn run_allocator_demo() {
     kinfo!("ALLOC", "Dynamic Vec<u32> len: {}, capacity: {}", vector.len(), vector.capacity());
     kinfo!("ALLOC", "Vec content slice: {:?}", &vector[0..5]);
 
-    let dynamic_string = String::from("Zenkai-OS Kernel Dynamic String");
+    let dynamic_string = String::from("Zengi-OS Kernel Dynamic String");
     kinfo!("ALLOC", "Allocated String: '{}' (len: {})", dynamic_string, dynamic_string.len());
 
     let boxed_val = Box::new(0xCAFE_BABE_u64);

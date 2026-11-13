@@ -1,4 +1,4 @@
-# Zenkai OS — Debian Mini-OS ISO Packaging & Boot Time Analysis
+# Zengi OS — Debian Mini-OS ISO Packaging & Boot Time Analysis
 
 **Course:** Operating Systems  
 **Student:** Swapnil Ghosh 25BTRCL267 AIML-E  
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary & Required Component Overview
 
-As specified by faculty requirements, the Zenkai Mini-OS incorporates all five foundational operating system capabilities into a standalone Debian-based live distribution:
+As specified by faculty requirements, the Zengi Mini-OS incorporates all five foundational operating system capabilities into a standalone Debian-based live distribution:
 
 1. **Network Connectivity (WiFi & LAN):** Complete Linux TCP/IP networking stack supporting Gigabit Ethernet and 802.11ac/ax wireless interfaces with WPA2/WPA3 authentication.
 2. **Laptop Hardware Compatibility:** Comprehensive ACPI power management, Intel/AMD/Nvidia DRM graphics acceleration, dynamic thermal throttling, battery monitor, and multi-touch touchpad drivers.
@@ -194,11 +194,11 @@ During your viva/presentation, explain this exact 6-phase pipeline showing how r
     -eltorito-alt-boot \
     -e boot/grub/efi.img \
     -no-emul-boot -isohybrid-gpt-basdat \
-    -output "zenkai_os_live.iso" \
+    -output "zengi_os_live.iso" \
     /iso-staging
   ```
 * **Why "Hybrid"?**  
-  A normal ISO can only be burned to optical CD/DVDs. An **isohybrid ISO** embeds a valid Master Boot Record (MBR) partition table at byte offset 0. This allows the exact same `.iso` file to be written directly to a USB thumb drive using `dd if=zenkai_os_live.iso of=/dev/sdX` and booted natively on physical laptop hardware!
+  A normal ISO can only be burned to optical CD/DVDs. An **isohybrid ISO** embeds a valid Master Boot Record (MBR) partition table at byte offset 0. This allows the exact same `.iso` file to be written directly to a USB thumb drive using `dd if=zengi_os_live.iso of=/dev/sdX` and booted natively on physical laptop hardware!
 
 ---
 
