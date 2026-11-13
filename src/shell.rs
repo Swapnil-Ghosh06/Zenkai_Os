@@ -81,7 +81,7 @@ impl Shell {
                 kprintln!("  sched        - Run Round Robin Task Scheduler demonstration (CA-6 Layer 5)");
                 kprintln!("  sync         - Run SpinLock concurrency and mutual exclusion test (Layer 7)");
                 kprintln!("  alloc        - Run Kernel Memory Allocator & dynamic heap demo (Layer 8)");
-                kprintln!("  r19          - Run Swapnil Ghosh's R19 AI/ML Page Replacement Engine");
+                kprintln!("  r19          - Run Swapnil Ghosh 25BTRCL267 AIML-E R19 AI/ML Page Replacement Engine");
                 kprintln!("  pagerepls    - Alias for 'r19' research benchmark");
                 kprintln!("  batch        - Execute full automated CA-6 end-to-end verification suite");
                 kprintln!("  clear        - Clear terminal display");
@@ -92,7 +92,7 @@ impl Shell {
                 kprintln!("----------------------- ZENKAI-OS SYSTEM OVERVIEW -----------------------");
                 kprintln!("  Kernel Name     : Zenkai OS (Zen-Architecture AI Educational Micro-Kernel)");
                 kprintln!("  Version         : 0.1.0-alpha");
-                kprintln!("  Author          : Swapnil Ghosh (25BTRCL___, 3 - AIML E)");
+                kprintln!("  Author          : Swapnil Ghosh 25BTRCL267 AIML-E");
                 kprintln!("  Target Arch     : x86_64-unknown-uefi (Bare-Metal 64-bit)");
                 kprintln!("  Firmware Type   : UEFI 2.x 64-bit with ACPI & APIC");
                 kprintln!("  Language        : 100% Rust (no_std, bare-metal)");

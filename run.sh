@@ -2,7 +2,7 @@
 # ==============================================================================
 # ZENKAI OS — Virtual Machine Runner for macOS (Apple Silicon / Intel)
 # Flagship Micro-OS Engineering Project (CA-6)
-# Author: Swapnil Ghosh
+# Author: Swapnil Ghosh 25BTRCL267 AIML-E
 # ==============================================================================
 
 set -euo pipefail
@@ -84,3 +84,4 @@ case "$BUILD_MODE" in
             -no-reboot
         ;;
 esac
+

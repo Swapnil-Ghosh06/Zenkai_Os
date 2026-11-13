@@ -1,6 +1,6 @@
 //! Flagship Research Specialization: R19 AI/ML Page Replacement Engine (CA-6)
 //!
-//! Author: Swapnil Ghosh
+//! Author: Swapnil Ghosh 25BTRCL267 AIML-E
 //! Research Topic: "Page Replacement for AI/ML-Like Access Patterns"
 //!
 //! Evaluates FIFO, LRU, and Belady's Optimal (OPT) page replacement policies
@@ -168,7 +168,7 @@ pub fn gen_random(out: &mut [u8], seed: u64) {
 
 pub fn run_r19_full_benchmark() {
     kinfo!("R19", "================================================================================");
-    kinfo!("R19", "         SWAPNIL GHOSH: R19 AI/ML PAGE REPLACEMENT RESEARCH ENGINE              ");
+    kinfo!("R19", "         SWAPNIL GHOSH 25BTRCL267 AIML-E: R19 AI/ML RESEARCH ENGINE             ");
     kinfo!("R19", "                 Zenkai-OS Kernel Verification Module (CA-6)                    ");
     kinfo!("R19", "================================================================================");
     kinfo!("R19", "Reference Length: {} | Page Space: {} pages | Test Frames: {:?}",
@@ -259,3 +259,4 @@ pub fn run_r19_full_benchmark() {
     kok!("R19", "All 5 Research Hypotheses (H1-H5) successfully replicated inside the Micro-OS!");
     kok!("R19", "================================================================================");
 }
+

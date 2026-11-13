@@ -7,7 +7,7 @@
 [![Status](https://img.shields.io/badge/Verification-12%2F12%20Passed%20(100%25)-brightgreen.svg)](#verification--test-harness)
 
 > **Continuous Assessment 6 (CA-6: 15 Marks)** — Flagship Systems Construction Project  
-> **Student:** Swapnil Ghosh (`25BTRCL___`, Class 3 – AIML E)  
+> **Student:** Swapnil Ghosh 25BTRCL267 AIML-E  
 > **Institution:** Department of Artificial Intelligence & Machine Learning  
 
 ---
@@ -210,3 +210,4 @@ Zenkai_Os/
 ├── R19_SWAP_v4.docx          # Original Research Paper by Swapnil Ghosh
 └── README.md                 # Complete system documentation
 ```
+

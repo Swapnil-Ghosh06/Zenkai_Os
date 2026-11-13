@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Zenkai-OS Automated Verification & Trace Analysis Harness (CA-6)
-Author: Swapnil Ghosh
+Author: Swapnil Ghosh 25BTRCL267 AIML-E
 
 Runs Zenkai-OS in headless QEMU, captures hardware UART serial logs,
 and validates that all CA-6 requirements and R19 research hypotheses are satisfied.
@@ -104,3 +104,4 @@ if __name__ == "__main__":
     setup_esp()
     output = run_qemu_test()
     verify_log(output)
+

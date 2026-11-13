@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # ZENKAI OS MASTER CLI — Custom command for running, testing & building
-# Author: Swapnil Ghosh
+# Author: Swapnil Ghosh 25BTRCL267 AIML-E
 # ==============================================================================
 
 set -euo pipefail
@@ -89,3 +89,4 @@ case "${1:-run}" in
         exit 1
         ;;
 esac
+

@@ -1,7 +1,7 @@
 # Zenkai OS — Debian Mini-OS ISO Packaging & Boot Time Analysis
 
 **Course:** Operating Systems  
-**Student:** Swapnil Ghosh (`25BTRCL___`, Class 3 – AIML E)  
+**Student:** Swapnil Ghosh 25BTRCL267 AIML-E  
 **Project:** Micro-OS / Mini-OS System Engineering & Presentation Report  
 
 ---
@@ -213,3 +213,4 @@ During your viva/presentation, explain this exact 6-phase pipeline showing how r
 | **5. Boot Time Measurements** | Progression benchmark table (1.42s → 2.18s → 2.65s → 2.91s → 4.15s) documented. |
 | **6. ISO Packaging Explanation** | Complete 6-phase pipeline (`debootstrap` → `chroot` → `squashfs` → `OverlayFS` → `xorriso` hybrid ISO) explained. |
 | **7. Research Integration** | Flagship R19 AI/ML Page Replacement Module compiled and verified. |
+

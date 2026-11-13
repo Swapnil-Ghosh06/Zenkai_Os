@@ -2,7 +2,7 @@
 # ==============================================================================
 # ZENKAI OS — Automated Debian Mini-OS ISO Builder Script
 # Demonstrates how source code and rootfs are packaged into a bootable ISO binary
-# Author: Swapnil Ghosh (25BTRCL___, 3 - AIML E)
+# Author: Swapnil Ghosh 25BTRCL267 AIML-E
 # ==============================================================================
 
 set -euo pipefail
@@ -79,3 +79,4 @@ echo "==========================================================================
 echo "[+] SUCCESS: Packaging specification complete!"
 echo "    Generated ISO can be booted in QEMU or flashed to USB using dd."
 echo "================================================================================"
+

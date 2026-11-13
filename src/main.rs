@@ -1,7 +1,7 @@
 //! ZENKAI OS - Educational Micro-Kernel for Systems Engineering & AI Memory Research
 //!
 //! Continuous Assessment 6 (CA-6) | Operating Systems
-//! Author: Swapnil Ghosh (25BTRCL___, 3 - AIML E)
+//! Author: Swapnil Ghosh 25BTRCL267 AIML-E
 //! Target: x86_64 Bare-Metal UEFI Environment
 
 #![no_main]
@@ -52,7 +52,7 @@ fn print_boot_banner() {
     kprintln!("\x1b[0m");
     kprintln!("  \x1b[1m\x1b[32mZenkai OS\x1b[0m — Zen-Architecture Educational Micro-Kernel");
     kprintln!("  Flagship Engineering Project (CA-6) | Operating Systems");
-    kprintln!("  Author: \x1b[1mSwapnil Ghosh\x1b[0m | Specialization: \x1b[33mR19 AI/ML Page Replacement\x1b[0m");
+    kprintln!("  Author: \x1b[1mSwapnil Ghosh 25BTRCL267 AIML-E\x1b[0m | Specialization: \x1b[33mR19 AI/ML Page Replacement\x1b[0m");
     kprintln!("  Target: x86_64 UEFI 64-bit | Status: \x1b[32mOperational\x1b[0m");
     kprintln!("--------------------------------------------------------------------------------");
 }
@@ -94,3 +94,4 @@ fn main() -> Status {
     kok!("KERNEL", "Zenkai OS shutting down cleanly. Goodbye!");
     Status::SUCCESS
 }
+

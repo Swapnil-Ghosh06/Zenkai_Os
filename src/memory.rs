@@ -62,3 +62,4 @@ pub fn print_memory_overview(stats: &MemoryStats) {
     kinfo!("MEM", "Allocated Frames    : {} ({} KB)", stats.allocated_frames, (stats.allocated_frames * PAGE_SIZE) / 1024);
     kinfo!("MEM", "Available Frames    : {} ({} KB)", stats.free_frames, (stats.free_frames * PAGE_SIZE) / 1024);
 }
+

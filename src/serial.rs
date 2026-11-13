@@ -99,3 +99,4 @@ impl fmt::Write for SerialPort {
         Ok(())
     }
 }
+

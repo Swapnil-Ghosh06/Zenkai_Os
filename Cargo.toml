@@ -2,7 +2,7 @@
 name = "zenkai_os"
 version = "0.1.0"
 edition = "2021"
-authors = ["Swapnil Ghosh"]
+authors = ["Swapnil Ghosh 25BTRCL267 AIML-E"]
 description = "Zenkai OS - Educational Micro-Kernel for Systems Engineering & AI Memory Research (CA-6)"
 
 [dependencies]
@@ -17,3 +17,4 @@ panic = "abort"
 opt-level = 3
 lto = true
 panic = "abort"
+
