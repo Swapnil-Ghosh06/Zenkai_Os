@@ -72,7 +72,7 @@ def verify_log(log):
         ("Layer 8: Dynamic FreeList Heap Manager", "Testing FreeList Dynamic Heap Allocator..."),
         ("Layer 7: SpinLock Concurrency & Mutual Exclusion", "SpinLock stress test PASSED! Mutual exclusion maintained"),
         ("Layers 3-6: Preemptive Round-Robin Task Scheduler", "Executing Round-Robin scheduling cycle"),
-        ("Layer 9: Interactive Zenkai OS Shell Prompt", "zenkai>"),
+        ("Layer 9: Interactive Zenkai OS Shell Prompt", "swapnil@zenkai-os"),
         ("Author Attribution: Swapnil Ghosh (25BTRCL267)", "Swapnil Ghosh"),
         ("R19 Research: Flagship AI/ML Page Replacement Engine", "SWAPNIL GHOSH: R19 AI/ML PAGE REPLACEMENT RESEARCH ENGINE"),
         ("R19 Research: AI/ML Workload Simulation", "Workload Pattern: Sequential"),

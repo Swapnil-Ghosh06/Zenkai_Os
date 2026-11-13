@@ -89,3 +89,4 @@ pub fn run_concurrency_stress_test() -> bool {
     let final_val = *TEST_LOCK.lock();
     final_val == iterations
 }
+

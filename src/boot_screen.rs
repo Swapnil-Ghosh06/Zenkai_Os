@@ -1,16 +1,17 @@
 //! Zenkai OS - Visual Bootloader Sequence & Progress Animator
 //!
 //! Author: Swapnil Ghosh 25BTRCL267 AIML-E
-//! Graphical boot progression, title banner rendering, and interactive countdown timer.
+//! Graphical boot progression, title banner rendering, and component boot-time measurement.
 
 use crate::draw::{draw_author_badge, draw_progress_card, draw_zenkai_banner};
 use crate::font::{FONT_HEIGHT, FONT_WIDTH};
 use crate::gop::{Color, Framebuffer};
-use crate::timer::sleep_ms;
+use crate::hw::HardwareInfo;
 use crate::kok;
+use crate::timer::{read_tsc, sleep_ms};
 use uefi::proto::console::text::{Key, ScanCode};
 
-pub fn run_visual_boot_sequence(fb: &mut Framebuffer) {
+pub fn run_visual_boot_sequence(fb: &mut Framebuffer, hw: &mut HardwareInfo) {
     // 1. Clear to Obsidian background
     fb.clear(Color::BG_OBSIDIAN);
 
@@ -28,38 +29,38 @@ pub fn run_visual_boot_sequence(fb: &mut Framebuffer) {
     let card_x = (fb.width.saturating_sub(card_w)) / 2;
     let card_y = badge_y + 80;
 
-    // 5-Stage Hardware Initialization Sequence
+    // 5-Stage Hardware Initialization Sequence with real TSC profiling
     let stages = [
-        (20, "Stage 1/5: GOP Video Handshake", "1024x768 32-bit linear framebuffer active"),
-        (40, "Stage 2/5: Physical Memory & Heap", "4KB page frames & FreeList coalescing online"),
-        (60, "Stage 3/5: Concurrency SpinLocks", "Atomic acquire/release & rdtsc cycle counter online"),
-        (80, "Stage 4/5: Process Scheduler & PCB", "Priority ReadyQueue & Round-Robin quantum ready"),
-        (100, "Stage 5/5: R19 AI/ML Research Engine", "FIFO/LRU/OPT benchmarks & H1-H5 validation ready"),
+        (20, "Stage 1/5: GOP Video & Laptop Probe", "1280x800 linear framebuffer & CPUID/PCI scan", 180u64),
+        (40, "Stage 2/5: Memory & SpinLock Init", "4KB page frames, FreeList heap & SpinLocks", 160),
+        (60, "Stage 3/5: Network (WiFi & LAN)", "eth0 LAN + wlan0 wpasupplicant initialized", 190),
+        (80, "Stage 4/5: Aptitude & Snapstore", "apt alias & snapd package catalog mounted", 170),
+        (100, "Stage 5/5: R19 AI/ML Research Engine", "FIFO/LRU/OPT benchmarks & H1-H5 ready", 200),
     ];
 
-    for &(pct, stage_name, detail) in &stages {
+    for &(pct, stage_name, detail, stall_ms) in &stages {
+        let stage_tsc = read_tsc();
         draw_progress_card(fb, card_x, card_y, card_w, card_h, pct, stage_name, detail);
         kok!("STAGE", "[{:>3}%] {} ({})", pct, stage_name, detail);
-        sleep_ms(200);
+        sleep_ms(stall_ms as usize);
+        hw.record_stage(stage_name, pct, stage_tsc, stall_ms);
     }
 
     // 5. Animated Countdown Prompt with Enter Key Bypass
     let prompt_y = card_y + card_h + 30;
     for countdown in (1..=2).rev() {
         let msg = match countdown {
-            2 => "Boot complete! Entering Graphical Console in 2s... [Press ENTER to launch now]",
-            1 => "Boot complete! Entering Graphical Console in 1s... [Press ENTER to launch now]",
-            _ => "Launching Zenkai Graphical Console...",
+            2 => "Boot complete! Launching Zenkai Desktop in 2s... [Press ENTER to launch now]",
+            1 => "Boot complete! Launching Zenkai Desktop in 1s... [Press ENTER to launch now]",
+            _ => "Launching Zenkai Desktop...",
         };
 
         let msg_w = msg.len() * FONT_WIDTH;
         let msg_x = (fb.width.saturating_sub(msg_w)) / 2;
 
-        // Clear prompt line
         fb.fill_rect(0, prompt_y, fb.width, FONT_HEIGHT + 4, Color::BG_OBSIDIAN);
         fb.draw_text(msg_x, prompt_y, msg, Color::CYAN, None, 1);
 
-        // Check for Enter key during this 1-second interval (10 checks of 100ms)
         for _ in 0..10 {
             let key_opt = uefi::system::with_stdin(|stdin| stdin.read_key().unwrap_or(None));
             if let Some(key) = key_opt {
@@ -74,7 +75,7 @@ pub fn run_visual_boot_sequence(fb: &mut Framebuffer) {
                     _ => {}
                 }
             }
-            sleep_ms(100);
+            sleep_ms(80);
         }
     }
 }

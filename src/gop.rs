@@ -1,7 +1,7 @@
 //! Zenkai OS - UEFI Graphics Output Protocol (GOP) & Framebuffer Driver
 //!
 //! Author: Swapnil Ghosh 25BTRCL267 AIML-E
-//! Direct hardware 32-bit linear framebuffer rendering.
+//! Direct hardware 32-bit linear framebuffer rendering with bounded viewports.
 
 use crate::font::{get_glyph, FONT_HEIGHT, FONT_WIDTH};
 
@@ -17,17 +17,20 @@ impl Color {
         Self { r, g, b }
     }
 
-    // High-aesthetic modern dark-palette constants
-    pub const BG_OBSIDIAN: Self = Self::new(10, 14, 20);      // #0A0E14
-    pub const BG_PANEL: Self = Self::new(18, 26, 38);         // #121A26
-    pub const BG_CARD: Self = Self::new(26, 38, 54);          // #1A2636
+    // Modern Slate/Indigo Desktop Palette
+    pub const BG_OBSIDIAN: Self = Self::new(11, 16, 27);      // #0B101B Desktop Canvas
+    pub const BG_BAR: Self = Self::new(17, 24, 39);           // #111827 Top Bar & Dock
+    pub const BG_PANEL: Self = Self::new(22, 31, 48);         // #161F30 Window / Panel
+    pub const BG_CARD: Self = Self::new(30, 41, 59);          // #1E293B Elevated Card
+    pub const BG_SELECT: Self = Self::new(37, 56, 84);        // #253854 Selected Row
     pub const CYAN: Self = Self::new(0, 210, 255);            // #00D2FF Cyber Cyan
-    pub const EMERALD: Self = Self::new(0, 230, 118);         // #00E676 High-tech Green
-    pub const AMBER: Self = Self::new(255, 171, 0);           // #FFAB00 Warning/Highlight
-    pub const CRIMSON: Self = Self::new(255, 61, 0);          // #FF3D00 Error/Fault
-    pub const WHITE: Self = Self::new(245, 248, 255);         // Crisp White
-    pub const SLATE: Self = Self::new(144, 164, 174);         // Subtle Text
-    pub const DARK_SLATE: Self = Self::new(55, 71, 79);       // Borders & Dividers
+    pub const INDIGO: Self = Self::new(99, 102, 241);         // #6366F1 Accent Indigo
+    pub const EMERALD: Self = Self::new(16, 230, 128);        // #10E680 Status Green
+    pub const AMBER: Self = Self::new(245, 158, 11);          // #F59E0B Warning / Highlight
+    pub const CRIMSON: Self = Self::new(239, 68, 68);         // #EF4444 Error / Fault
+    pub const WHITE: Self = Self::new(241, 245, 249);         // #F1F5F9 Crisp White
+    pub const SLATE: Self = Self::new(148, 163, 184);         // #94A3B8 Muted Text
+    pub const DARK_SLATE: Self = Self::new(51, 65, 85);       // #334155 Borders & Dividers
 }
 
 pub struct Framebuffer {
@@ -38,7 +41,6 @@ pub struct Framebuffer {
     pub is_bgr: bool,
 }
 
-// Framebuffer raw pointer is statically safe inside the bare-metal single-core UEFI environment
 unsafe impl Send for Framebuffer {}
 unsafe impl Sync for Framebuffer {}
 
@@ -74,37 +76,53 @@ impl Framebuffer {
     }
 
     pub fn clear(&mut self, color: Color) {
-        let packed = self.pack_color(color);
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let offset = y * self.stride + x;
-                unsafe {
-                    self.base.add(offset).write_volatile(packed);
-                }
-            }
-        }
+        self.fill_rect(0, 0, self.width, self.height, color);
     }
 
     pub fn fill_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: Color) {
         let x_end = (x + w).min(self.width);
         let y_end = (y + h).min(self.height);
+        if x >= x_end || y >= y_end {
+            return;
+        }
         let packed = self.pack_color(color);
 
         for cy in y..y_end {
-            for cx in x..x_end {
-                let offset = cy * self.stride + cx;
-                unsafe {
-                    self.base.add(offset).write_volatile(packed);
+            let row_start = cy * self.stride + x;
+            let count = x_end - x;
+            unsafe {
+                let ptr = self.base.add(row_start);
+                for i in 0..count {
+                    ptr.add(i).write_volatile(packed);
                 }
             }
         }
     }
 
     pub fn draw_border(&mut self, x: usize, y: usize, w: usize, h: usize, thickness: usize, color: Color) {
-        self.fill_rect(x, y, w, thickness, color); // Top
-        self.fill_rect(x, y + h.saturating_sub(thickness), w, thickness, color); // Bottom
-        self.fill_rect(x, y, thickness, h, color); // Left
-        self.fill_rect(x + w.saturating_sub(thickness), y, thickness, h, color); // Right
+        self.fill_rect(x, y, w, thickness, color);
+        self.fill_rect(x, y + h.saturating_sub(thickness), w, thickness, color);
+        self.fill_rect(x, y, thickness, h, color);
+        self.fill_rect(x + w.saturating_sub(thickness), y, thickness, h, color);
+    }
+
+    /// Draws a modern card with subtle 2px chamfered corners and 1px border.
+    pub fn draw_card(&mut self, x: usize, y: usize, w: usize, h: usize, fill: Color, border: Color) {
+        if w < 6 || h < 6 {
+            return;
+        }
+        self.fill_rect(x + 2, y, w - 4, h, fill);
+        self.fill_rect(x, y + 2, w, h - 4, fill);
+        // Border edges
+        self.fill_rect(x + 2, y, w - 4, 1, border);
+        self.fill_rect(x + 2, y + h - 1, w - 4, 1, border);
+        self.fill_rect(x, y + 2, 1, h - 4, border);
+        self.fill_rect(x + w - 1, y + 2, 1, h - 4, border);
+        // Corner bevels
+        self.set_pixel(x + 1, y + 1, border);
+        self.set_pixel(x + w - 2, y + 1, border);
+        self.set_pixel(x + 1, y + h - 2, border);
+        self.set_pixel(x + w - 2, y + h - 2, border);
     }
 
     pub fn draw_char(&mut self, x: usize, y: usize, ch: char, fg: Color, bg: Option<Color>, scale: usize) {
@@ -116,11 +134,7 @@ impl Framebuffer {
             let bits = glyph[row];
             for col in 0..FONT_WIDTH {
                 let is_fg = (bits & (0x80 >> col)) != 0;
-                let px_color = if is_fg {
-                    Some(packed_fg)
-                } else {
-                    packed_bg
-                };
+                let px_color = if is_fg { Some(packed_fg) } else { packed_bg };
 
                 if let Some(val) = px_color {
                     for sy in 0..scale {
@@ -155,37 +169,32 @@ impl Framebuffer {
         }
     }
 
-    /// Scrolls the screen vertically by `pixel_rows` upward, filling the exposed bottom with `fill_color`.
-    pub fn scroll_up(&mut self, pixel_rows: usize, fill_color: Color) {
-        if pixel_rows >= self.height {
-            self.clear(fill_color);
+    /// Scrolls only a bounded rectangular region `(rx, ry, rw, rh)` upward by `pixel_rows`.
+    pub fn scroll_region(&mut self, rx: usize, ry: usize, rw: usize, rh: usize, pixel_rows: usize, fill_color: Color) {
+        let rx_end = (rx + rw).min(self.width);
+        let ry_end = (ry + rh).min(self.height);
+        if rx >= rx_end || ry >= ry_end {
+            return;
+        }
+        let actual_w = rx_end - rx;
+        let actual_h = ry_end - ry;
+
+        if pixel_rows >= actual_h {
+            self.fill_rect(rx, ry, actual_w, actual_h, fill_color);
             return;
         }
 
-        // Copy scanlines up
-        let rows_to_copy = self.height - pixel_rows;
-        for y in 0..rows_to_copy {
-            let src_y = y + pixel_rows;
-            let dst_offset = y * self.stride;
-            let src_offset = src_y * self.stride;
+        let rows_to_copy = actual_h - pixel_rows;
+        for row in 0..rows_to_copy {
+            let dst_y = ry + row;
+            let src_y = ry + row + pixel_rows;
+            let dst_offset = dst_y * self.stride + rx;
+            let src_offset = src_y * self.stride + rx;
             unsafe {
-                core::ptr::copy(
-                    self.base.add(src_offset),
-                    self.base.add(dst_offset),
-                    self.width,
-                );
+                core::ptr::copy(self.base.add(src_offset), self.base.add(dst_offset), actual_w);
             }
         }
 
-        // Clear newly exposed bottom rows
-        let packed_fill = self.pack_color(fill_color);
-        for y in rows_to_copy..self.height {
-            for x in 0..self.width {
-                let offset = y * self.stride + x;
-                unsafe {
-                    self.base.add(offset).write_volatile(packed_fill);
-                }
-            }
-        }
+        self.fill_rect(rx, ry + rows_to_copy, actual_w, pixel_rows, fill_color);
     }
 }

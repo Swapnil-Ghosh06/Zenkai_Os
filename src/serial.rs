@@ -73,3 +73,4 @@ impl core::fmt::Write for SerialPort {
         Ok(())
     }
 }
+

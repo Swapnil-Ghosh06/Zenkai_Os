@@ -22,3 +22,4 @@ pub fn read_tsc() -> u64 {
 pub fn sleep_ms(ms: usize) {
     uefi::boot::stall(ms * 1000);
 }
+

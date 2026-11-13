@@ -37,3 +37,4 @@ impl Task {
         self.burst_remaining == 0
     }
 }
+

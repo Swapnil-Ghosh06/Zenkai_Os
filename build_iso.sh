@@ -11,10 +11,10 @@ echo "==========================================================================
 echo "          ZENKAI OS: DEBIAN MINI-OS LIVE ISO PACKAGING PIPELINE                 "
 echo "================================================================================"
 
-WORK_DIR="/tmp/zengi-iso-build"
+WORK_DIR="/tmp/zenkai-iso-build"
 ROOTFS="$WORK_DIR/chroot"
 IMAGE_DIR="$WORK_DIR/image"
-OUTPUT_ISO="zengi_os_live.iso"
+OUTPUT_ISO="zenkai_os_live.iso"
 
 echo "[1/6] Cleaning and preparing build directories..."
 rm -rf "$WORK_DIR"
@@ -29,14 +29,14 @@ echo "      - Network Stack (WiFi & LAN): wpasupplicant, NetworkManager, wireles
 echo "      - Laptop Hardware: ACPI, thermald, tlp, xserver-xorg-input-libinput"
 echo "      - In-built Package Manager: aptitude (aliased as apt)"
 echo "      - In-built Store: snapd & snap-store"
-echo "      - R19 Research Integration: /usr/local/bin/zengi-r19"
+echo "      - R19 Research Integration: /usr/local/bin/zenkai-r19"
 
 # Writing the required APTITUDE alias into bashrc
 mkdir -p "$ROOTFS/etc"
 cat << 'EOF' > "$ROOTFS/etc/bash.bashrc"
-# Zengi OS System Configuration
+# Zenkai OS System Configuration
 alias apt="aptitude"
-export PS1='\[\033[01;32m\]zengi-os\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+export PS1='\[\033[01;32m\]zenkai-os\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
 EOF
 
 echo "[4/6] Compressing rootfs into SquashFS image (mksquashfs)..."
@@ -47,10 +47,10 @@ cat << 'EOF' > "$IMAGE_DIR/isolinux/isolinux.cfg"
 UI menu.c32
 PROMPT 0
 TIMEOUT 50
-DEFAULT zengi
+DEFAULT zenkai
 
-LABEL zengi
-  MENU LABEL Zengi OS (Live Educational Micro-OS)
+LABEL zenkai
+  MENU LABEL Zenkai OS (Live Educational Micro-OS)
   LINUX /live/vmlinuz
   INITRD /live/initrd.img
   APPEND boot=live components quiet splash
@@ -60,7 +60,7 @@ cat << 'EOF' > "$IMAGE_DIR/boot/grub/grub.cfg"
 set default="0"
 set timeout=5
 
-menuentry "Zengi OS (Live Educational Micro-OS - UEFI Mode)" {
+menuentry "Zenkai OS (Live Educational Micro-OS - UEFI Mode)" {
     linux /live/vmlinuz boot=live components quiet splash
     initrd /live/initrd.img
 }

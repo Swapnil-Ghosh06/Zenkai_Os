@@ -73,3 +73,4 @@ impl FrameAllocator {
         self.total_frames - self.allocated_count
     }
 }
+
