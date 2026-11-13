@@ -1,11 +1,11 @@
 //! Flagship Research Specialization: R19 AI/ML Page Replacement Engine (CA-6)
 //!
 //! Author: Swapnil Ghosh 25BTRCL267 AIML-E
-//! Research Topic: "Page Replacement for AI/ML-Like Access Patterns"
+//! Research Topic: "Page Replacement for AI/ML-Like Access Patterns" (R19_SWAP_v4.docx)
 //!
 //! Evaluates FIFO, LRU, and Belady's Optimal (OPT) page replacement policies
 //! under four AI/ML access patterns (Sequential, Strided, Bursty, Random)
-//! directly inside the Zengi-OS kernel, validating Hypotheses H1-H5.
+//! directly inside the Zenkai-OS kernel, validating Hypotheses H1-H5.
 
 extern crate alloc;
 use alloc::collections::VecDeque;
@@ -133,43 +133,42 @@ pub fn gen_strided(out: &mut [u8]) {
 /// Bursty: DataLoader mini-batch hot-set (working set = 8 pages)
 pub fn gen_bursty(out: &mut [u8], seed: u64) {
     let mut s = seed;
-    let burst_len = 40usize;
-    let hot_set_size = 8usize;
-    let mut i = 0;
+    let mut hot_set = 0usize;
 
-    while i < out.len() {
-        let current_burst = burst_len.min(out.len() - i);
-        for b in 0..current_burst {
-            out[i + b] = (b % hot_set_size) as u8;
+    for (i, v) in out.iter_mut().enumerate() {
+        if i % 50 == 0 {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            hot_set = (s as usize) % (PAGE_SPACE - 8);
         }
-        i += current_burst;
-        if i >= out.len() {
-            break;
-        }
-        // Random transition page between bursts
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        out[i] = ((s >> 33) as usize % PAGE_SPACE) as u8;
-        i += 1;
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        let offset = (s as usize) % 8;
+        *v = (hot_set + offset) as u8;
     }
 }
 
-/// Random: Sparse embedding table lookups (LCG pseudo-random generator)
+/// Random: Baseline uniformly distributed access pattern
 pub fn gen_random(out: &mut [u8], seed: u64) {
     let mut s = seed;
     for v in out.iter_mut() {
-        s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        *v = ((s >> 33) as usize % PAGE_SPACE) as u8;
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        *v = ((s as usize) % PAGE_SPACE) as u8;
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Execution & Hypotheses Verification Suite
+// 3. Execution & Verification Harness
 // ─────────────────────────────────────────────────────────────────────────────
 
 pub fn run_r19_full_benchmark() {
     kinfo!("R19", "================================================================================");
-    kinfo!("R19", "         SWAPNIL GHOSH 25BTRCL267 AIML-E: R19 AI/ML RESEARCH ENGINE             ");
-    kinfo!("R19", "                 Zengi-OS Kernel Verification Module (CA-6)                    ");
+    kinfo!("R19", "         SWAPNIL GHOSH: R19 AI/ML PAGE REPLACEMENT RESEARCH ENGINE              ");
+    kinfo!("R19", "                 Zenkai-OS Kernel Verification Module (CA-6)                    ");
     kinfo!("R19", "================================================================================");
     kinfo!("R19", "Reference Length: {} | Page Space: {} pages | Test Frames: {:?}",
            REF_LENGTH, PAGE_SPACE, TEST_FRAMES);
@@ -259,4 +258,3 @@ pub fn run_r19_full_benchmark() {
     kok!("R19", "All 5 Research Hypotheses (H1-H5) successfully replicated inside the Micro-OS!");
     kok!("R19", "================================================================================");
 }
-

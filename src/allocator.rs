@@ -1,120 +1,123 @@
-//! Educational Kernel Heap Allocator (CA-6 Layer 8)
+//! Zenkai OS - FreeList Dynamic Heap Allocator
 //!
-//! Implements explicit Bump Allocation and Free-List Allocation with
-//! first-fit search, header management, and block coalescing.
+//! Author: Swapnil Ghosh 25BTRCL267 AIML-E
+//! CA-6 Layer 8: Dynamic Memory Allocation, First-Fit Strategy & Block Coalescing.
 
-extern crate alloc;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
-use crate::{kinfo, kok};
-
-const HEAP_CAPACITY: usize = 64 * 1024; // 64 KB dedicated educational pool
+pub const HEAP_SIZE: usize = 64 * 1024; // 64 KB heap pool for kernel structures
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
-struct BlockHeader {
-    size: usize,
-    is_free: bool,
+pub struct BlockHeader {
+    pub size: usize,
+    pub is_free: bool,
+    pub next: Option<*mut BlockHeader>,
 }
 
 pub struct FreeListAllocator {
-    pool: [u8; HEAP_CAPACITY],
-    allocated_bytes: usize,
-    alloc_count: usize,
-    free_count: usize,
+    heap: [u8; HEAP_SIZE],
+    head: Option<*mut BlockHeader>,
+    pub total_allocated: usize,
+    pub peak_allocated: usize,
 }
 
 impl FreeListAllocator {
     pub const fn new() -> Self {
         Self {
-            pool: [0u8; HEAP_CAPACITY],
-            allocated_bytes: 0,
-            alloc_count: 0,
-            free_count: 0,
+            heap: [0; HEAP_SIZE],
+            head: None,
+            total_allocated: 0,
+            peak_allocated: 0,
         }
     }
 
-    /// Allocate a block of memory of given size
-    pub fn allocate(&mut self, size: usize) -> Option<usize> {
-        // Align to 8 bytes
-        let aligned_size = (size + 7) & !7;
-        let total_needed = aligned_size + core::mem::size_of::<BlockHeader>();
-
-        if self.allocated_bytes + total_needed > HEAP_CAPACITY {
-            return None;
-        }
-
-        let offset = self.allocated_bytes;
-        let header = BlockHeader {
-            size: aligned_size,
-            is_free: false,
-        };
+    pub fn init(&mut self) {
+        let base_ptr = self.heap.as_mut_ptr() as *mut BlockHeader;
+        let header_size = core::mem::size_of::<BlockHeader>();
+        let initial_capacity = HEAP_SIZE - header_size;
 
         unsafe {
-            let header_ptr = self.pool.as_mut_ptr().add(offset) as *mut BlockHeader;
-            core::ptr::write(header_ptr, header);
+            base_ptr.write(BlockHeader {
+                size: initial_capacity,
+                is_free: true,
+                next: None,
+            });
+        }
+        self.head = Some(base_ptr);
+    }
+
+    pub fn allocate(&mut self, size: usize) -> Option<*mut u8> {
+        let align = core::mem::align_of::<usize>();
+        let aligned_size = (size + align - 1) & !(align - 1);
+        let header_size = core::mem::size_of::<BlockHeader>();
+
+        let mut current = self.head;
+        while let Some(block_ptr) = current {
+            let block = unsafe { &mut *block_ptr };
+            if block.is_free && block.size >= aligned_size {
+                if block.size >= aligned_size + header_size + 16 {
+                    // Split the block
+                    let remaining_size = block.size - aligned_size - header_size;
+                    let next_block_ptr = unsafe {
+                        (block_ptr as *mut u8).add(header_size + aligned_size) as *mut BlockHeader
+                    };
+
+                    unsafe {
+                        next_block_ptr.write(BlockHeader {
+                            size: remaining_size,
+                            is_free: true,
+                            next: block.next,
+                        });
+                    }
+
+                    block.size = aligned_size;
+                    block.is_free = false;
+                    block.next = Some(next_block_ptr);
+                } else {
+                    block.is_free = false;
+                }
+
+                self.total_allocated += block.size;
+                if self.total_allocated > self.peak_allocated {
+                    self.peak_allocated = self.total_allocated;
+                }
+
+                let payload_ptr = unsafe { (block_ptr as *mut u8).add(header_size) };
+                return Some(payload_ptr);
+            }
+            current = block.next;
+        }
+        None
+    }
+
+    pub fn deallocate(&mut self, ptr: *mut u8) {
+        if ptr.is_null() {
+            return;
         }
 
-        self.allocated_bytes += total_needed;
-        self.alloc_count += 1;
+        let header_size = core::mem::size_of::<BlockHeader>();
+        let block_ptr = unsafe { ptr.sub(header_size) as *mut BlockHeader };
+        let block = unsafe { &mut *block_ptr };
+        block.is_free = true;
+        self.total_allocated = self.total_allocated.saturating_sub(block.size);
 
-        Some(offset + core::mem::size_of::<BlockHeader>())
+        // Coalesce adjacent free blocks
+        self.coalesce();
     }
 
-    /// Mark block as free (simplification for educational tracking)
-    pub fn deallocate(&mut self, _offset: usize) {
-        self.free_count += 1;
+    fn coalesce(&mut self) {
+        let mut current = self.head;
+        let header_size = core::mem::size_of::<BlockHeader>();
+
+        while let Some(curr_ptr) = current {
+            let curr = unsafe { &mut *curr_ptr };
+            if let Some(next_ptr) = curr.next {
+                let next = unsafe { &mut *next_ptr };
+                if curr.is_free && next.is_free {
+                    curr.size += header_size + next.size;
+                    curr.next = next.next;
+                    continue; // Re-check this block with the new next
+                }
+            }
+            current = curr.next;
+        }
     }
-
-    pub fn stats(&self) -> (usize, usize, usize, usize) {
-        (
-            HEAP_CAPACITY,
-            self.allocated_bytes,
-            self.alloc_count,
-            self.free_count,
-        )
-    }
-}
-
-/// Run an empirical demonstration of dynamic heap allocation and data structures
-pub fn run_allocator_demo() {
-    kinfo!("ALLOC", "=== CA-6 Layer 8: Memory Allocation Subsystem ===");
-
-    // 1. Test Educational Free-List Allocator
-    kinfo!("ALLOC", "Phase 1: Direct Kernel Block Allocator...");
-    let mut alloc = FreeListAllocator::new();
-
-    let blk1 = alloc.allocate(128).expect("Allocation blk1 failed");
-    let blk2 = alloc.allocate(512).expect("Allocation blk2 failed");
-    let blk3 = alloc.allocate(1024).expect("Allocation blk3 failed");
-
-    kinfo!("ALLOC", "Allocated blk1 (128 B) at offset: 0x{:X}", blk1);
-    kinfo!("ALLOC", "Allocated blk2 (512 B) at offset: 0x{:X}", blk2);
-    kinfo!("ALLOC", "Allocated blk3 (1024 B) at offset: 0x{:X}", blk3);
-
-    alloc.deallocate(blk2);
-    kinfo!("ALLOC", "Deallocated blk2. Coalescing available chunk.");
-
-    let (total, used, allocs, frees) = alloc.stats();
-    kinfo!("ALLOC", "Pool Capacity: {} KB | Used: {} B | Allocs: {} | Frees: {}",
-           total / 1024, used, allocs, frees);
-
-    // 2. Test High-Level Dynamic Rust Heap Collections (Vec, Box, String)
-    kinfo!("ALLOC", "Phase 2: Global Dynamic Rust Allocator (Vec, Box, String)...");
-
-    let mut vector: Vec<u32> = Vec::new();
-    for i in 1..=10 {
-        vector.push(i * 10);
-    }
-    kinfo!("ALLOC", "Dynamic Vec<u32> len: {}, capacity: {}", vector.len(), vector.capacity());
-    kinfo!("ALLOC", "Vec content slice: {:?}", &vector[0..5]);
-
-    let dynamic_string = String::from("Zengi-OS Kernel Dynamic String");
-    kinfo!("ALLOC", "Allocated String: '{}' (len: {})", dynamic_string, dynamic_string.len());
-
-    let boxed_val = Box::new(0xCAFE_BABE_u64);
-    kinfo!("ALLOC", "Heap Boxed Value: 0x{:X}", *boxed_val);
-
-    kok!("ALLOC", "Memory Allocator SUCCESS: Dynamic memory lifecycle verified.");
 }

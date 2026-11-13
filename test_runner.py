@@ -8,6 +8,7 @@ and validates that all CA-6 requirements and R19 research hypotheses are satisfi
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -30,20 +31,16 @@ def build_kernel():
 
 def setup_esp():
     os.makedirs(os.path.join(ESP_DIR, "EFI", "BOOT"), exist_ok=True)
-    import shutil
     shutil.copyfile(EFI_BINARY, os.path.join(ESP_DIR, "EFI", "BOOT", "BOOTX64.EFI"))
-    # Write nomenu for fast automated test
-    with open(os.path.join(ESP_DIR, "EFI", "BOOT", "aeon.cfg"), "w") as f:
-        f.write("nomenu\n")
 
 def run_qemu_test():
     qemu_bin = "qemu-system-x86_64"
     for candidate in ["qemu-system-x86_64", "/opt/homebrew/bin/qemu-system-x86_64", "/usr/local/bin/qemu-system-x86_64"]:
-        if shutil_which(candidate) or os.path.exists(candidate):
+        if shutil.which(candidate) or os.path.exists(candidate):
             qemu_bin = candidate
             break
 
-    print(f"\033[36m[*] Running QEMU ({qemu_bin}) for 6 seconds...\033[0m")
+    print(f"\033[36m[*] Running QEMU ({qemu_bin}) test harness...\033[0m")
     cmd = [
         qemu_bin,
         "-machine", "q35",
@@ -55,13 +52,7 @@ def run_qemu_test():
     ]
 
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    try:
-        time.sleep(3)
-        proc.stdin.write("r19\n")
-        proc.stdin.flush()
-        time.sleep(2)
-    except Exception:
-        pass
+    time.sleep(7)
     proc.terminate()
     try:
         stdout, stderr = proc.communicate(timeout=2)
@@ -71,25 +62,21 @@ def run_qemu_test():
 
     return stdout
 
-def shutil_which(cmd):
-    import shutil
-    return shutil.which(cmd)
-
 def verify_log(log):
     print("\n\033[36m====================== VERIFICATION REPORT ======================\033[0m")
     checks = [
-        ("Layer 1: UEFI x86_64 Boot Entry Point", "Zenkai OS 0.9.2"),
-        ("Layer 2: Video Framebuffer Console (GOP)", "fb gop"),
-        ("Layer 2: Dual Serial Port Output", "sinks serial=true"),
-        ("Layer 8: Physical Frame Allocation (4KB Pages)", "mm frames:"),
-        ("Layer 8: 32 MB Dynamic Kernel Heap", "mm heap: 32768 KiB"),
-        ("Layer 6: Local APIC Hardware Timer", "timer lapic timer ok"),
-        ("Layer 5: Preemptive Task Scheduler", "sched task shell started"),
-        ("Layer 6: Boot Stages Microsecond Latency Analysis", "stage early-init took"),
-        ("Layer 7: Hardware Protections (NX, GDT, TSS, IDT)", "cpu gdt/tss/idt loaded"),
-        ("Layer 9: Interactive Zenkai OS Shell", "Zenkai OS shell"),
-        ("R19 Research Engine: AI/ML Access Patterns", "SWAPNIL GHOSH 25BTRCL267 AIML-E: R19 AI/ML RESEARCH ENGINE"),
-        ("R19 Research Engine: Hypotheses Replication", "All 5 Research Hypotheses (H1-H5) successfully replicated")
+        ("Layer 1: UEFI x86_64 Boot Entry Point", "Layer 1: UEFI x86_64 64-bit Kernel Entry Point verified."),
+        ("Layer 2: Dual Serial Port & Console", "Layer 2: Dual Serial (COM1 115200 8N1) and GOP Framebuffer ready."),
+        ("Layer 2: GOP Framebuffer Detection", "GOP Framebuffer detected"),
+        ("Layer 8: Physical Frame Allocation (4KB Pages)", "Testing Physical Frame Allocator (4KB pages)..."),
+        ("Layer 8: Dynamic FreeList Heap Manager", "Testing FreeList Dynamic Heap Allocator..."),
+        ("Layer 7: SpinLock Concurrency & Mutual Exclusion", "SpinLock stress test PASSED! Mutual exclusion maintained"),
+        ("Layers 3-6: Preemptive Round-Robin Task Scheduler", "Executing Round-Robin scheduling cycle"),
+        ("Layer 9: Interactive Zenkai OS Shell Prompt", "zenkai>"),
+        ("Author Attribution: Swapnil Ghosh (25BTRCL267)", "Swapnil Ghosh"),
+        ("R19 Research: Flagship AI/ML Page Replacement Engine", "SWAPNIL GHOSH: R19 AI/ML PAGE REPLACEMENT RESEARCH ENGINE"),
+        ("R19 Research: AI/ML Workload Simulation", "Workload Pattern: Sequential"),
+        ("R19 Research: Hypotheses Replication (H1-H5)", "All 5 Research Hypotheses (H1-H5) successfully replicated inside the Micro-OS!")
     ]
 
     passed = 0
@@ -107,9 +94,11 @@ def verify_log(log):
     else:
         print("\033[33m[!] Some verification checks were not detected in output.\033[0m")
     print("\033[36m=================================================================\033[0m\n")
+    return passed == len(checks)
 
 if __name__ == "__main__":
     build_kernel()
     setup_esp()
     output = run_qemu_test()
-    verify_log(output)
+    success = verify_log(output)
+    sys.exit(0 if success else 1)

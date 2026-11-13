@@ -1,30 +1,24 @@
-//! Hardware Timer and Tick Generator (CA-6 Layer 6)
+//! Zenkai OS - Hardware Timer & Cycle Counter
 //!
-//! Provides cycle-accurate hardware timing using x86 RDTSC instructions
-//! and simulated periodic timer ticks for preemptive quantum enforcement.
+//! Author: Swapnil Ghosh 25BTRCL267 AIML-E
+//! x86 rdtsc cycle counter and microsecond stall calibration.
 
-use core::arch::asm;
-
-pub struct HardwareTimer;
-
-impl HardwareTimer {
-    /// Read the 64-bit x86 Time Stamp Counter (RDTSC)
-    #[inline]
-    pub fn read_tsc() -> u64 {
-        let low: u32;
-        let high: u32;
-        unsafe {
-            asm!("rdtsc", out("eax") low, out("edx") high, options(nomem, nostack));
-        }
-        ((high as u64) << 32) | (low as u64)
+#[inline(always)]
+pub fn read_tsc() -> u64 {
+    let low: u32;
+    let high: u32;
+    unsafe {
+        core::arch::asm!(
+            "rdtsc",
+            out("eax") low,
+            out("edx") high,
+            options(nomem, nostack, preserves_flags)
+        );
     }
-
-    /// Spin-delay for approximately `cycles` CPU clock cycles
-    pub fn delay_cycles(cycles: u64) {
-        let start = Self::read_tsc();
-        while Self::read_tsc().wrapping_sub(start) < cycles {
-            core::hint::spin_loop();
-        }
-    }
+    ((high as u64) << 32) | (low as u64)
 }
 
+/// Sleeps for `ms` milliseconds using UEFI BootServices stall.
+pub fn sleep_ms(ms: usize) {
+    uefi::boot::stall(ms * 1000);
+}

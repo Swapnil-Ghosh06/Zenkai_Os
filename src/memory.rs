@@ -1,65 +1,75 @@
-//! Physical Memory Management & Frame Tracking (CA-6 Layer 8)
+//! Zenkai OS - Physical Frame Allocator (4KB Pages)
 //!
-//! Tracks 4KB physical page frames and provides system memory accounting.
-
-use crate::kinfo;
+//! Author: Swapnil Ghosh 25BTRCL267 AIML-E
+//! CA-6 Layer 8: Memory Subsystem, Frame Accounting & Physical Memory Management.
 
 pub const PAGE_SIZE: usize = 4096;
+pub const MAX_FRAMES: usize = 1024; // 4MB managed physical pool for educational demonstration
 
-#[derive(Debug, Clone, Copy)]
-pub struct MemoryStats {
-    pub total_memory_bytes: usize,
-    pub total_frames: usize,
-    pub allocated_frames: usize,
-    pub free_frames: usize,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PhysFrame {
+    pub frame_number: usize,
 }
 
-pub struct PhysicalFrameAllocator {
+impl PhysFrame {
+    pub fn start_address(&self) -> usize {
+        self.frame_number * PAGE_SIZE
+    }
+}
+
+pub struct FrameAllocator {
+    bitmap: [u64; MAX_FRAMES / 64],
     total_frames: usize,
-    allocated_frames: usize,
+    allocated_count: usize,
 }
 
-impl PhysicalFrameAllocator {
-    pub const fn new(total_frames: usize) -> Self {
+impl FrameAllocator {
+    pub const fn new() -> Self {
         Self {
-            total_frames,
-            allocated_frames: 0,
+            bitmap: [0; MAX_FRAMES / 64],
+            total_frames: MAX_FRAMES,
+            allocated_count: 0,
         }
     }
 
-    /// Allocate a 4KB physical frame
-    pub fn allocate_frame(&mut self) -> Option<usize> {
-        if self.allocated_frames < self.total_frames {
-            let frame_idx = self.allocated_frames;
-            self.allocated_frames += 1;
-            Some(frame_idx)
-        } else {
-            None
+    pub fn allocate_frame(&mut self) -> Option<PhysFrame> {
+        for word_idx in 0..self.bitmap.len() {
+            if self.bitmap[word_idx] != u64::MAX {
+                for bit_idx in 0..64 {
+                    let mask = 1u64 << bit_idx;
+                    if (self.bitmap[word_idx] & mask) == 0 {
+                        self.bitmap[word_idx] |= mask;
+                        self.allocated_count += 1;
+                        let frame_number = word_idx * 64 + bit_idx;
+                        return Some(PhysFrame { frame_number });
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn deallocate_frame(&mut self, frame: PhysFrame) {
+        if frame.frame_number < self.total_frames {
+            let word_idx = frame.frame_number / 64;
+            let bit_idx = frame.frame_number % 64;
+            let mask = 1u64 << bit_idx;
+            if (self.bitmap[word_idx] & mask) != 0 {
+                self.bitmap[word_idx] &= !mask;
+                self.allocated_count = self.allocated_count.saturating_sub(1);
+            }
         }
     }
 
-    /// Free an allocated frame
-    pub fn deallocate_frame(&mut self) {
-        if self.allocated_frames > 0 {
-            self.allocated_frames -= 1;
-        }
+    pub fn total_frames(&self) -> usize {
+        self.total_frames
     }
 
-    pub fn stats(&self) -> MemoryStats {
-        MemoryStats {
-            total_memory_bytes: self.total_frames * PAGE_SIZE,
-            total_frames: self.total_frames,
-            allocated_frames: self.allocated_frames,
-            free_frames: self.total_frames.saturating_sub(self.allocated_frames),
-        }
+    pub fn allocated_frames(&self) -> usize {
+        self.allocated_count
+    }
+
+    pub fn free_frames(&self) -> usize {
+        self.total_frames - self.allocated_count
     }
 }
-
-pub fn print_memory_overview(stats: &MemoryStats) {
-    kinfo!("MEM", "=== Physical Memory Subsystem ===");
-    kinfo!("MEM", "Page Frame Size     : {} bytes (4 KB)", PAGE_SIZE);
-    kinfo!("MEM", "Total Physical RAM  : {} MB ({} frames)", stats.total_memory_bytes / (1024 * 1024), stats.total_frames);
-    kinfo!("MEM", "Allocated Frames    : {} ({} KB)", stats.allocated_frames, (stats.allocated_frames * PAGE_SIZE) / 1024);
-    kinfo!("MEM", "Available Frames    : {} ({} KB)", stats.free_frames, (stats.free_frames * PAGE_SIZE) / 1024);
-}
-
