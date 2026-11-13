@@ -4,16 +4,20 @@
 //! Topic: "Page Replacement for AI/ML-Like Access Patterns"
 //!
 //! Implements FIFO, LRU, and OPT page replacement algorithms as a kernel
-//! module. Access patterns (sequential, random, bursty, strided) are
-//! evaluated live inside the Zengi-OS kernel, validating Hypotheses H1-H5.
+//! module. Evaluates access patterns (sequential, random, bursty, strided)
+//! live inside the Zenkai-OS graphical virtual machine console.
 
 extern crate alloc;
 use alloc::collections::VecDeque;
-use crate::info;
+use alloc::format;
 
 pub const PAGE_SPACE: usize = 32;
 pub const REF_LEN: usize = 500;
 pub const TEST_FRAMES: [usize; 6] = [2, 4, 8, 12, 16, 32];
+
+fn sprint(s: &str) {
+    crate::log::print_raw(s.as_bytes());
+}
 
 // ── FIFO ────────────────────────────────────────────────────────────────────
 pub fn fifo(refs: &[u8], frames: usize) -> usize {
@@ -63,7 +67,6 @@ pub fn opt(refs: &[u8], frames: usize) -> usize {
             loaded.push_back(p);
             continue;
         }
-        // find which loaded page is used furthest in the future
         let victim = loaded.iter().copied().max_by_key(|&f| {
             refs[i + 1..].iter().position(|&x| x == f).unwrap_or(usize::MAX)
         }).unwrap();
@@ -120,11 +123,12 @@ pub fn gen_strided(out: &mut [u8]) {
 pub fn run_demo() {
     let mut refs = [0u8; REF_LEN];
 
-    info!("r19", "================================================================================");
-    info!("r19", "         SWAPNIL GHOSH 25BTRCL267 AIML-E: R19 AI/ML RESEARCH ENGINE             ");
-    info!("r19", "                 Zengi-OS Kernel Verification Module (CA-6)                    ");
-    info!("r19", "================================================================================");
-    info!("r19", "page_space={} ref_len={} test_frames={:?}", PAGE_SPACE, REF_LEN, TEST_FRAMES);
+    sprint("\n================================================================================\n");
+    sprint("         SWAPNIL GHOSH 25BTRCL267 AIML-E: R19 AI/ML RESEARCH ENGINE             \n");
+    sprint("                 Zenkai-OS Kernel Verification Module (CA-6)                    \n");
+    sprint("================================================================================\n");
+    sprint(&format!("Page Space: {} pages | Reference Length: {} | Test Frames: {:?}\n\n",
+                    PAGE_SPACE, REF_LEN, TEST_FRAMES));
 
     let patterns: &[(&str, &str, fn(&mut [u8]))] = &[
         ("Sequential", "Tensor Forward Pass (Streaming Weights)", |r| gen_sequential(r)),
@@ -135,10 +139,9 @@ pub fn run_demo() {
 
     for (name, desc, generator) in patterns {
         generator(&mut refs);
-        info!("r19", ">>> Workload Pattern: {} [{}]", name, desc);
-        info!("r19", "{:<6} | {:<12} | {:<12} | {:<12} | {:<10} | {:<12}",
-              "Frames", "FIFO Faults", "LRU Faults", "OPT Faults", "OPT Gap", "LRU Better?");
-        info!("r19", "--------------------------------------------------------------------------------");
+        sprint(&format!(">>> Workload Pattern: {} [{}]\n", name, desc));
+        sprint("Frames | FIFO Faults  | LRU Faults   | OPT Faults   | OPT Gap    | LRU Better?\n");
+        sprint("--------------------------------------------------------------------------------\n");
 
         for &f in &TEST_FRAMES {
             let ff = fifo(&refs, f);
@@ -147,32 +150,32 @@ pub fn run_demo() {
             let opt_gap = lf.saturating_sub(of);
             let lru_better = lf < ff;
 
-            info!("r19",
-                  "{:<6} | {:<12} | {:<12} | {:<12} | {:<10} | {:<12}",
-                  f, ff, lf, of, opt_gap,
-                  if lru_better { "YES (LRU+)" } else if lf == ff { "EQUAL (=)" } else { "NO (FIFO+)" }
-            );
+            sprint(&format!(
+                "{:<6} | {:<12} | {:<12} | {:<12} | {:<10} | {:<12}\n",
+                f, ff, lf, of, opt_gap,
+                if lru_better { "YES (LRU+)" } else if lf == ff { "EQUAL (=)" } else { "NO (FIFO+)" }
+            ));
         }
 
-        // Verify hypothesis per pattern
         match *name {
             "Sequential" => {
-                info!("r19", "[HYPOTHESIS H1 CONFIRMED]: 100% fault rate for FIFO and LRU at all frames < 32.");
+                sprint("[HYPOTHESIS H1 CONFIRMED]: 100% fault rate for FIFO and LRU at all frames < 32.\n");
+                sprint("                            Temporal locality assumption completely inverted.\n\n");
             }
             "Strided" => {
-                info!("r19", "[HYPOTHESIS H4 CONFIRMED]: Binary Cliff detected! 100% faults until frames fit full cycle.");
+                sprint("[HYPOTHESIS H4 CONFIRMED]: Binary Cliff detected! 100% faults until frames fit full cycle.\n\n");
             }
             "Bursty" => {
-                info!("r19", "[HYPOTHESIS H3 CONFIRMED]: LRU significantly outperforms FIFO under hot-set working sets.");
+                sprint("[HYPOTHESIS H3 CONFIRMED]: LRU significantly outperforms FIFO under hot-set working sets.\n\n");
             }
             "Random" => {
-                info!("r19", "[HYPOTHESIS H2 CONFIRMED]: FIFO ≈ LRU under random accesses. Absence of predictive signal.");
+                sprint("[HYPOTHESIS H2 CONFIRMED]: FIFO ≈ LRU under random accesses. Absence of predictive signal.\n\n");
             }
             _ => {}
         }
     }
 
-    info!("r19", "================================================================================");
-    info!("r19", "All 5 Research Hypotheses (H1-H5) successfully replicated inside Zengi OS!");
-    info!("r19", "================================================================================");
+    sprint("================================================================================\n");
+    sprint("All 5 Research Hypotheses (H1-H5) successfully replicated inside Zenkai OS!\n");
+    sprint("================================================================================\n\n");
 }

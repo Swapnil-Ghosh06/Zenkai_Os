@@ -792,7 +792,7 @@ extern "C" fn aeon_exception_entry(frame: *const ExcFrame) -> ! {
         crate::usermode::user_fault(f, EXC_NAMES.get(f.vector as usize).copied().unwrap_or("unknown"), read_cr2());
     }
     if IN_EXCEPTION.swap(true, Ordering::SeqCst) {
-        crate::log::raw_panic_line("[AEON] nested exception, halting\n");
+        crate::log::raw_panic_line("[ZENKAI OS] nested exception, halting\n");
         halt_forever();
     }
     let name = EXC_NAMES.get(f.vector as usize).copied().unwrap_or("unknown");

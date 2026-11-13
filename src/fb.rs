@@ -57,7 +57,6 @@ const CURSOR_BG: (u8, u8, u8) = (200, 208, 224);
 
 
 /// Letter spacing added between the wordmark's letters, in pixels at scale 1.
-#[allow(dead_code)]
 const WORDMARK_TRACKING: usize = 6;
 /// Widest character cell any face uses (for the per-row scratch buffer).
 const MAX_CELL_W: usize = 32;
@@ -300,14 +299,21 @@ impl Console {
         self.draw_logo_rgb(LOGO_RGB, BG);
     }
 
-    /// Draws "ZENGI OS" in centred header face, starting at text row `logo_row`.
+    /// Draws "ZENKAI OS" and student credits, centred, starting at text row `logo_row`.
     fn draw_logo_rgb(&self, fg: (u8, u8, u8), bg: (u8, u8, u8)) {
-        let scale = self.ws * 3;
+        let scale = 3 * self.ws;
         let tracking = 4 * self.ws;
-        let text = "ZENGI OS";
-        let w = gfont::text_width(&gfont::SANS_24, text) * scale + (text.len() - 1) * tracking;
+        let title = "ZENKAI OS";
+        let w = gfont::text_width(&gfont::SANS_24, title) * scale + (title.len() - 1) * tracking;
         let x = self.width.saturating_sub(w) / 2;
-        self.draw_text(&gfont::SANS_24, x, self.logo_row * self.chh, fg, bg, text, scale, tracking);
+        let y = self.logo_row * self.chh;
+        self.draw_text(&gfont::SANS_24, x, y, fg, bg, title, scale, tracking);
+
+        let sub = "Swapnil Ghosh 25BTRCL267 AIML-E";
+        let sub_scale = 1 * self.ws;
+        let sub_w = gfont::text_width(&gfont::SANS_16, sub) * sub_scale;
+        let sub_x = self.width.saturating_sub(sub_w) / 2;
+        self.draw_text(&gfont::SANS_16, sub_x, y + 26 * scale, (160, 180, 200), bg, sub, sub_scale, 0);
     }
 
     /// Draws `text` with its top-left at pixel (`x`, `y`) in `face`, magnified `scale` times, with
@@ -475,23 +481,23 @@ impl Console {
             self.splash = false;
             let bg = self.px(BG);
             self.fill_rect(0, 0, self.width, self.height, bg);
-            let scale = self.ws * 3;
+            let scale = 3 * self.ws;
             let tracking = 4 * self.ws;
-            let logo = "ZENGI OS";
-            let w = gfont::text_width(&gfont::SANS_24, logo) * scale + (logo.len() - 1) * tracking;
+            let title = "ZENKAI OS";
+            let w = gfont::text_width(&gfont::SANS_24, title) * scale + (title.len() - 1) * tracking;
             let x = self.width.saturating_sub(w) / 2;
             let y = self.height / 14;
-            self.draw_text(&gfont::SANS_24, x, y, LOGO_RGB, BG, logo, scale, tracking);
+            self.draw_text(&gfont::SANS_24, x, y, LOGO_RGB, BG, title, scale, tracking);
 
-            // Subtitle with student ID and class
             let sub = "Swapnil Ghosh 25BTRCL267 AIML-E";
-            let sub_w = gfont::text_width(&gfont::SANS_16, sub) * self.ws;
+            let sub_scale = 1 * self.ws;
+            let sub_w = gfont::text_width(&gfont::SANS_16, sub) * sub_scale;
             let sub_x = self.width.saturating_sub(sub_w) / 2;
-            self.draw_text(&gfont::SANS_16, sub_x, y + gfont::SANS_24.height as usize * scale + 8, (180, 195, 220), BG, sub, self.ws, 1);
+            self.draw_text(&gfont::SANS_16, sub_x, y + 26 * scale, (160, 180, 200), BG, sub, sub_scale, 0);
         }
         let (face, sc) = if self.width >= 1600 { (&gfont::SANS_24, if self.width >= 3000 { 2 } else { 1 }) } else { (&gfont::SANS_16, 1) };
         let item_h = (face.height as usize + 12) * sc;
-        let list_top = self.height / 14 + (gfont::SANS_24.height as usize * self.ws * 3) + 40 * sc;
+        let list_top = self.height / 14 + gfont::WORDMARK.height as usize * self.ws + 36 * sc;
         let panel_w = (self.width / 3).clamp(300 * sc, 700 * sc).min(self.width);
         let panel_x = (self.width - panel_w) / 2;
         let list_h = entries.len() * item_h;
@@ -664,9 +670,9 @@ impl Console {
             let w = gfont::text_width(face, text) * scale + text.chars().count().saturating_sub(1) * tracking;
             this.draw_text(face, this.width.saturating_sub(w) / 2, y, fg, PANIC_BG, text, scale, tracking);
         };
-        center(self, &gfont::SANS_24, y, "ZENGI OS", PANIC_MARK, self.ws * 3, 4 * self.ws);
-        y += gfont::SANS_24.height as usize * self.ws * 3 + 56 * sc;
-        center(self, big, y, "Zengi OS has stopped.", PANIC_TITLE, sc, 0);
+        center(self, &gfont::SANS_24, y, "ZENKAI OS", PANIC_MARK, 3 * self.ws, 4 * self.ws);
+        y += mark_h + 56 * sc;
+        center(self, big, y, "Zenkai OS has stopped.", PANIC_TITLE, sc, 0);
         y += big.height as usize * sc + 24 * sc;
         for l in lines {
             center(self, small, y, core::str::from_utf8(l).unwrap_or(""), PANIC_TEXT, sc, 0);

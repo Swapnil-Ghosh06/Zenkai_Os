@@ -1,17 +1,17 @@
 [package]
-name = "zengi_os"
+name = "zenkai_os"
 version = "0.9.2"
 edition = "2024"
 rust-version = "1.86"
 authors = ["Swapnil Ghosh 25BTRCL267 AIML-E"]
-description = "Zengi OS: UEFI x86_64 Educational Micro-Kernel & R19 AI/ML Research Engine"
+description = "Zenkai OS: UEFI x86_64 Educational Micro-Kernel & R19 AI/ML Research Engine"
 
 [lib]
 name = "aeon"
 path = "src/lib.rs"
 
 [[bin]]
-name = "zengi_os"
+name = "zenkai_os"
 path = "src/main.rs"
 
 [features]

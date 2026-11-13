@@ -167,12 +167,8 @@ impl Fat32Writer {
         }
         let mut s = [0u8; SECTOR_SIZE];
         dev.read(base, &mut s)?;
-        if s[66] == 0x29 {
-            let label = &s[71..82];
-            let is_known = label == *b"ZENGI      " || label == *b"ZENGIOS    " || label == *b"AEON       " || label == *b"NO NAME    ";
-            if !is_known && label[0] == 0 {
-                return Err(WriteError::NotWritable(Reason::WrongLabel));
-            }
+        if s[66] != 0x29 || (s[71..82] != *b"AEON       " && s[71..82] != *b"ZENKAI     ") {
+            return Err(WriteError::NotWritable(Reason::WrongLabel));
         }
         if s[40] & 0x80 != 0 {
             return Err(WriteError::NotWritable(Reason::NoMirroring));

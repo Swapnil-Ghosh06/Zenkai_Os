@@ -123,7 +123,7 @@ pub fn remove_dir(dev: &mut dyn BlockWrite, rel: &str) -> Result<(), &'static st
 
 fn map_write_err(e: WriteError) -> &'static str {
     match e {
-        WriteError::NotWritable(Reason::WrongLabel) => "volume label is not ZENGI or supported (read only)",
+        WriteError::NotWritable(Reason::WrongLabel) => "volume label is not ZENKAI or AEON (read only)",
         WriteError::NotWritable(Reason::NotFat32) => "not a FAT32 volume",
         WriteError::NotWritable(Reason::NoMirroring) => "volume mirroring disabled",
         WriteError::NotWritable(Reason::Damaged(_)) => "damaged volume",

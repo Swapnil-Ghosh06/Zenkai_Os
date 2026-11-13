@@ -78,7 +78,7 @@ fn ps2_byte() -> Option<u8> {
 fn cmd_help(arg: &str) {
     match arg {
         "" => {
-            out!("Zengi OS shell. `help <command>` explains one command, `help all` lists them with descriptions.\n");
+            out!("Zenkai OS shell. `help <command>` explains one command, `help all` lists them with descriptions.\n");
             out!("Keys: Up/Down scroll the screen (PgUp/PgDn a page, Ctrl+Home/End top/bottom), Ctrl+Up/Down old commands.\n");
             out!("Edit: Tab completes, Left/Right/Home/End/Delete, Ctrl+A/E/U/K/W. Ctrl+L clear, Ctrl+C cancel.\n\n");
             for g in cmdhelp::GROUPS {
@@ -106,7 +106,7 @@ fn cmd_help(arg: &str) {
 
 fn cmd_info() {
     let b = boot::info();
-    out!("kernel     Zengi OS (Author: Swapnil Ghosh 25BTRCL267 AIML-E)\n");
+    out!("kernel     Zenkai OS (Author: Swapnil Ghosh 25BTRCL267 AIML-E)\n");
     out!("research   R19 AI/ML Page Replacement Module (Type 'r19')\n");
     out!("firmware   {} rev {:#x}, UEFI {}.{}\n", b.fw_vendor_str(), b.fw_revision, b.uefi_revision >> 16, (b.uefi_revision & 0xFFFF) / 10);
     out!("secure boot {}\n", b.secure_boot.name());
@@ -146,7 +146,7 @@ fn cmd_cpu() {
 }
 
 fn cmd_version() {
-    out!("Zengi OS {} (Swapnil Ghosh 25BTRCL267 AIML-E) x86_64 UEFI\n", crate::VERSION);
+    out!("Zenkai OS {} (Swapnil Ghosh 25BTRCL267 AIML-E) x86_64 UEFI\n", crate::VERSION);
 }
 
 fn yes(b: bool) -> &'static str {
@@ -1508,7 +1508,7 @@ fn run(line: &str, hist: &History) {
         "help" | "?" | "man" => cmd_help(rest),
         "info" => cmd_info(),
         "version" | "ver" => cmd_version(),
-        "uname" => out!("Zengi OS {} x86_64 UEFI (Swapnil Ghosh 25BTRCL267 AIML-E)\n", crate::VERSION),
+        "uname" => out!("Zenkai OS {} x86_64 UEFI (Swapnil Ghosh 25BTRCL267 AIML-E)\n", crate::VERSION),
         "history" => {
             for (i, l) in hist.iter().enumerate() {
                 out!("{:>3}  {}\n", i + 1, core::str::from_utf8(l).unwrap_or("?"));
@@ -1642,9 +1642,9 @@ impl History {
 /// The prompt: `aeon> ` at the top, `aeon:/sd> ` inside a folder, so you can see where you are.
 fn prompt() -> String {
     if cwd().is_empty() {
-        String::from("zengi> ")
+        String::from("zenkai> ")
     } else {
-        alloc::format!("zengi:{}> ", cwd())
+        alloc::format!("zenkai:{}> ", cwd())
     }
 }
 // ---- the full-screen editor behind `edit <file>` ----
@@ -1833,7 +1833,9 @@ pub extern "C" fn shell_task(_: usize) {
     log::with_console(Console::fullscreen_log);
     // A line may be longer than the screen is wide: the console wraps it onto the next rows.
     ed.set_max(MAX_LINE);
-    out!("\nZengi OS shell - Author: Swapnil Ghosh 25BTRCL267 AIML-E. Type `help` or `r19`.\n{}", prompt());
+    out!("\nZenkai OS shell - Author: Swapnil Ghosh 25BTRCL267 AIML-E. Type `help` or `r19`.\n{}", prompt());
+    crate::pagerepls::run_demo();
+    out!("{}", prompt());
     loop {
         let mut idle = true;
         // Keys come from the PS/2 controller and from a USB keyboard (xHCI driver), whichever has one.
@@ -1961,24 +1963,24 @@ pub extern "C" fn status_task(_: usize) {
         let secs = log::uptime_us() / 1_000_000;
         let back = log::with_console(|c| c.scrolled()).unwrap_or(0);
         let mut line = LineBuf::<256>::new();
-        let _h = mm::heap_stats();
+        let h = mm::heap_stats();
         let f = mm::frame_stats();
         // A narrow screen (640 px has 71 columns) gets a shorter bar, so the scroll hint is not cut off.
         let cols = log::with_console(|c| c.size().0).unwrap_or(80);
         let (secs_h, secs_m, secs_s) = (secs / 3600, (secs / 60) % 60, secs % 60);
         let free_mb = f.free as u64 * 4 / 1024;
         if cols >= 84 {
-            let hint = if back > 0 { "SCROLLED (End = live)" } else { "help, r19 | Up/Down scroll" };
+            let hint = if back > 0 { "SCROLLED (End = live)" } else { "help | Up/Down scroll" };
             let _ = write!(
                 line,
-                " ZENGI OS {} | Swapnil Ghosh 25BTRCL267 | up {:02}:{:02}:{:02} | {} MB free | tasks {} | {}",
-                crate::VERSION, secs_h, secs_m, secs_s, free_mb, task_count(), hint
+                " ZENKAI OS {} | Swapnil Ghosh 25BTRCL267 | up {:02}:{:02}:{:02} | {} MB free | heap {}K | tasks {} | {}",
+                crate::VERSION, secs_h, secs_m, secs_s, free_mb, h.used / 1024, task_count(), hint
             );
         } else {
             let hint = if back > 0 { "SCROLLED, End=live" } else { "Up/Down scroll" };
             let _ = write!(
                 line,
-                " ZENGI OS {} | up {:02}:{:02}:{:02} | {} MB free | tasks {} | {}",
+                " ZENKAI OS {} | up {:02}:{:02}:{:02} | {} MB free | tasks {} | {}",
                 crate::VERSION, secs_h, secs_m, secs_s, free_mb, task_count(), hint
             );
         }

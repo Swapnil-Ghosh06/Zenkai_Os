@@ -436,7 +436,7 @@ fn verify_eventlog(bs: &BootServices) {
 /// security fix that old images must not be trusted without.
 const SBAT_TEXT: &str = concat!(
     "sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md\n",
-    "aeon,1,Aeon,aeon,",
+    "zenkai,1,Zenkai OS,zenkai,",
     env!("CARGO_PKG_VERSION"),
     ",-\n\0"
 );
@@ -453,11 +453,10 @@ static SBAT: [u8; SBAT_TEXT.len()] = {
     a
 };
 
-/// Reads the config file `\EFI\BOOT\zengi.cfg` (or `aeon.cfg`) from the volume the image was loaded from into `out`.
+/// Reads the config file `\EFI\BOOT\aeon.cfg` from the volume the image was loaded from into `out`.
 /// Returns the byte count, 0 when there is no file or no readable volume.
 fn read_config_file(bs: &BootServices, device: Handle, out: &mut [u8]) -> usize {
-    const PATH_ZENGI: [u16; 20] = uefi::utf16(b"\\EFI\\BOOT\\zengi.cfg\0");
-    const PATH_AEON:  [u16; 19] = uefi::utf16(b"\\EFI\\BOOT\\aeon.cfg\0");
+    const PATH: [u16; 19] = uefi::utf16(b"\\EFI\\BOOT\\aeon.cfg\0");
     let mut fs: *mut c_void = core::ptr::null_mut();
     if device.is_null() || (bs.handle_protocol)(device, &uefi::SIMPLE_FS_GUID, &mut fs) != uefi::SUCCESS || fs.is_null() {
         return 0;
@@ -469,19 +468,19 @@ fn read_config_file(bs: &BootServices, device: Handle, out: &mut [u8]) -> usize 
         return 0;
     }
     let mut file: *mut uefi::File = core::ptr::null_mut();
-    // Try zengi.cfg first, fallback to aeon.cfg
-    let mut s = unsafe { ((*root).open)(root, &mut file, PATH_ZENGI.as_ptr(), uefi::FILE_MODE_READ, 0) };
-    if s != uefi::SUCCESS || file.is_null() {
-        s = unsafe { ((*root).open)(root, &mut file, PATH_AEON.as_ptr(), uefi::FILE_MODE_READ, 0) };
-    }
+    // SAFETY: `root` is the volume's open root directory; PATH is a NUL-terminated UTF-16 string.
+    let s = unsafe { ((*root).open)(root, &mut file, PATH.as_ptr(), uefi::FILE_MODE_READ, 0) };
     let mut n = 0;
     if s == uefi::SUCCESS && !file.is_null() {
         let mut size = out.len();
+        // SAFETY: `file` is open for reading; `out` is valid for `size` bytes, which is its length.
         if unsafe { ((*file).read)(file, &mut size, out.as_mut_ptr()) } == uefi::SUCCESS {
             n = size.min(out.len());
         }
+        // SAFETY: `file` was opened above and is closed exactly once.
         unsafe { ((*file).close)(file) };
     }
+    // SAFETY: `root` was opened above and is closed exactly once.
     unsafe { ((*root).close)(root) };
     n
 }
@@ -730,7 +729,7 @@ fn boot_menu(st: &SystemTable, bs: &BootServices, rt: &RuntimeServices, mut opts
     unsafe { ((*st.con_in).reset)(st.con_in, false) };
     info!("menu", "menu open: boot starts in {} s (arrow keys choose another entry, Enter selects, any other key stops the countdown)", opts.menu_timeout);
     // Dawn owns the screen; log lines are held back and replayed when it closes.
-    info!("menu", "options: Boot Zengi OS | Recovery mode | Firmware shell | Debug logging | Firmware setup | Restart | Power off");
+    info!("menu", "options: Boot Zenkai OS | Recovery mode | Firmware shell | Debug logging | Firmware setup | Restart | Power off");
     let hz = u128::from(log::tsc_hz().max(1));
     let mut menu = Menu::new(opts.menu_timeout);
     let mut last = aeon::arch::rdtsc();
@@ -869,7 +868,7 @@ pub extern "efiapi" fn efi_main(image: Handle, st_ptr: *mut SystemTable) -> Stat
     stage("firmware-entry");
     info!(
         "boot",
-        "Zengi OS {} - Author: Swapnil Ghosh 25BTRCL267 AIML-E | arch=x86_64 profile={}",
+        "Zenkai OS {} - Author: Swapnil Ghosh 25BTRCL267 AIML-E | arch=x86_64 profile={}",
         aeon::VERSION,
         if cfg!(debug_assertions) { "dev" } else { "release" }
     );
@@ -1011,7 +1010,7 @@ pub extern "efiapi" fn efi_main(image: Handle, st_ptr: *mut SystemTable) -> Stat
         warn!("boot", "RECOVERY MODE: {} failed boot(s) in a row. Log on screen, no timer, no scheduler, single-task shell.", boot_info().boot_count);
     }
     if boot_info().cfg_len > 0 {
-        info!("boot", "options from config: {} bytes; effective options \"{}\"", boot_info().cfg_len, boot_info().cmdline_str());
+        info!("boot", "options from aeon.cfg: {} bytes; effective options \"{}\"", boot_info().cfg_len, boot_info().cmdline_str());
     }
     {
         // Catch the bar up with the stages that ran before the console existed.
@@ -1102,7 +1101,7 @@ pub extern "efiapi" fn efi_main(image: Handle, st_ptr: *mut SystemTable) -> Stat
     opts = boot_menu(st, bs, rt, opts);
     let _ = opts;
     info!("menu", "boot continues after the menu");
-    set_loader_var(rt, &uefi::utf16(b"LoaderInfo\0"), concat!("Aeon ", env!("CARGO_PKG_VERSION")));
+    set_loader_var(rt, &uefi::utf16(b"LoaderInfo\0"), concat!("Zenkai OS ", env!("CARGO_PKG_VERSION")));
     publish_loader_interface(rt);
 
     // ---- Stage 5: ExitBootServices ----
@@ -1437,7 +1436,7 @@ static PANICKING: AtomicBool = AtomicBool::new(false);
 fn panic(info: &core::panic::PanicInfo) -> ! {
     arch::disable_interrupts();
     if PANICKING.swap(true, Ordering::SeqCst) {
-        log::raw_panic_line("[AEON] nested panic, halting\n");
+        log::raw_panic_line("[ZENKAI OS] nested panic, halting\n");
         arch::halt_forever();
     }
     // The panic may have happened inside the logger; release it and show every level.

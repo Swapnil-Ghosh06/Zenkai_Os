@@ -27,7 +27,7 @@ pub const ENTRIES: [Entry; 7] = [Entry::Boot, Entry::Recovery, Entry::FirmwareSh
 impl Entry {
     pub fn label(self, debug_on: bool) -> &'static str {
         match self {
-            Entry::Boot => "Boot Zengi OS",
+            Entry::Boot => "Boot Zenkai OS",
             Entry::Recovery => "Recovery mode",
             Entry::FirmwareShell => "Firmware shell",
             Entry::Debug if debug_on => "Debug logging: on",
@@ -41,7 +41,7 @@ impl Entry {
     /// The one line shown under the list while the entry is highlighted.
     pub fn description(self) -> &'static str {
         match self {
-            Entry::Boot => "Start Zengi OS normally.",
+            Entry::Boot => "Start Aeon normally.",
             Entry::Recovery => "Start with messages on screen and no scheduler, for repairs.",
             Entry::FirmwareShell => "Open the UEFI command shell.",
             Entry::Debug => "Turn detailed messages during boot on or off.",
@@ -233,7 +233,7 @@ mod tests {
         let m = Menu::new(15);
         assert_eq!(m.selected_entry(), Entry::Boot);
         assert_eq!(m.countdown(), Some(15));
-        assert_eq!(footer(&m), "Boot Zengi OS in 15 seconds");
+        assert_eq!(footer(&m), "Boot Zenkai OS in 15 seconds");
     }
 
     #[test]
@@ -247,7 +247,7 @@ mod tests {
         assert_eq!(m.countdown(), Some(2));
         assert_eq!(m.tick(1), Outcome::Footer);
         assert_eq!(m.countdown(), Some(1));
-        assert_eq!(footer(&m), "Boot Zengi OS in 1 second");
+        assert_eq!(footer(&m), "Boot Zenkai OS in 1 second");
         assert_eq!(m.tick(999), Outcome::Idle);
         assert_eq!(m.tick(1), Outcome::Run(Entry::Boot));
         assert_eq!(m.tick(1000), Outcome::Idle, "runs only once");
@@ -272,11 +272,11 @@ mod tests {
         m.key(Key::Down);
         assert_eq!(m.selected_entry(), Entry::FirmwareShell);
         assert_eq!(m.countdown(), Some(15), "not frozen: a full countdown after the last key");
-        assert_eq!(footer(&m), "Boot Zengi OS in 15 seconds, or press Enter for Firmware shell");
+        assert_eq!(footer(&m), "Boot Zenkai OS in 15 seconds, or press Enter for Firmware shell");
         assert_eq!(m.tick(1000), Outcome::Footer);
-        assert_eq!(footer(&m), "Boot Zengi OS in 14 seconds, or press Enter for Firmware shell");
+        assert_eq!(footer(&m), "Boot Zenkai OS in 14 seconds, or press Enter for Firmware shell");
         assert_eq!(m.tick(13_000), Outcome::Footer);
-        assert_eq!(footer(&m), "Boot Zengi OS in 1 second, or press Enter for Firmware shell");
+        assert_eq!(footer(&m), "Boot Zenkai OS in 1 second, or press Enter for Firmware shell");
         assert_eq!(m.tick(1000), Outcome::Run(Entry::Boot), "the shell is not started; Aeon boots");
         // moving on every entry keeps restarting the full countdown
         let mut m = Menu::new(15);
