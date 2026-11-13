@@ -17,24 +17,30 @@ impl Color {
         Self { r, g, b }
     }
 
-    // Modern Linux Distro Palette (Catppuccin / Pop!_OS / Twilight Indigo)
-    pub const BG_TOP: Self = Self::new(15, 20, 35);         // #0F1423 Deep Midnight Indigo
-    pub const BG_BOTTOM: Self = Self::new(26, 34, 56);      // #1A2238 Twilight Slate
-    pub const SURFACE: Self = Self::new(22, 27, 40);        // #161B28 Window Body
-    pub const SURFACE_ALT: Self = Self::new(29, 36, 54);    // #1D2436 Titlebar / Dock
-    pub const SURFACE_HOVER: Self = Self::new(39, 48, 71);  // #273047 Selected Row
-    pub const BORDER: Self = Self::new(46, 56, 82);         // #2E3852 Hairline Border
-    pub const SHADOW: Self = Self::new(7, 10, 18);          // #070A12 Soft Shadow
+    // macOS / Glass Dark Palette (Frosted Dark, Soft Indigo & Violet)
+    pub const BG_TOP: Self = Self::new(11, 14, 26);         // #0B0E1A Deep Space Indigo
+    pub const BG_BOTTOM: Self = Self::new(24, 20, 44);      // #18142C Soft Twilight Violet
+    pub const SURFACE: Self = Self::new(22, 25, 38);        // #161926 Frosted Window Body
+    pub const SURFACE_ALT: Self = Self::new(32, 36, 54);    // #202436 Frosted Titlebar / Dock
+    pub const SURFACE_CARD: Self = Self::new(36, 41, 62);   // #24293E Glass Card
+    pub const SURFACE_HOVER: Self = Self::new(48, 55, 84);  // #303754 Hover / Active Row
+    pub const BORDER: Self = Self::new(66, 76, 112);        // #424C70 Crisp Glass Hairline
+    pub const SHADOW: Self = Self::new(5, 7, 14);           // #05070E Soft Shadow
 
-    pub const TEXT_PRIMARY: Self = Self::new(241, 245, 249);// #F1F5F9 Crisp White
-    pub const TEXT_MUTED: Self = Self::new(148, 163, 184);  // #94A3B8 Cool Slate
-    pub const TEXT_DIM: Self = Self::new(100, 116, 139);    // #64748B Subtle Caption
+    pub const TEXT_PRIMARY: Self = Self::new(244, 246, 252);// #F4F6FC Crisp White
+    pub const TEXT_MUTED: Self = Self::new(158, 169, 194);  // #9EA9C2 Soft Slate
+    pub const TEXT_DIM: Self = Self::new(105, 117, 146);    // #697592 Subtle Caption
 
-    pub const ACCENT: Self = Self::new(96, 165, 250);       // #60A5FA Sky Blue
+    pub const ACCENT: Self = Self::new(108, 158, 255);      // #6C9EFF Soft Mac Indigo-Blue
     pub const VIOLET: Self = Self::new(167, 139, 250);      // #A78BFA Soft Violet
-    pub const SAGE: Self = Self::new(52, 211, 153);         // #34D399 Mint Green
-    pub const AMBER: Self = Self::new(251, 191, 36);        // #FBBF24 Soft Gold
+    pub const SAGE: Self = Self::new(52, 211, 153);         // #34D399 Emerald Mint
+    pub const AMBER: Self = Self::new(251, 191, 36);        // #FBBF24 Warm Amber
     pub const CORAL: Self = Self::new(248, 113, 113);       // #F87171 Soft Coral
+
+    // macOS Traffic-Light Window Controls
+    pub const TRAFFIC_RED: Self = Self::new(255, 95, 86);
+    pub const TRAFFIC_YELLOW: Self = Self::new(255, 189, 46);
+    pub const TRAFFIC_GREEN: Self = Self::new(39, 201, 63);
 
     // Compatibility aliases for console macros
     pub const BG_OBSIDIAN: Self = Self::BG_TOP;
@@ -98,6 +104,37 @@ impl Framebuffer {
             ((bg.g as u16 * inv + fg.g as u16 * a) / 255) as u8,
             ((bg.b as u16 * inv + fg.b as u16 * a) / 255) as u8,
         )
+    }
+
+    #[inline(always)]
+    pub fn read_raw_pixel(&self, x: usize, y: usize) -> u32 {
+        if x < self.width && y < self.height {
+            let offset = y * self.stride + x;
+            unsafe { self.base.add(offset).read_volatile() }
+        } else {
+            0
+        }
+    }
+
+    #[inline(always)]
+    pub fn write_raw_pixel(&mut self, x: usize, y: usize, raw: u32) {
+        if x < self.width && y < self.height {
+            let offset = y * self.stride + x;
+            unsafe { self.base.add(offset).write_volatile(raw) }
+        }
+    }
+
+    /// Draws a macOS-style frosted glass card with rounded corners and subtle 1px border.
+    pub fn draw_glass_panel(&mut self, x: usize, y: usize, w: usize, h: usize, r: usize, fill: Color, border: Color) {
+        self.draw_rounded_rect(x, y, w, h, r, fill, Some(border));
+    }
+
+    /// Draws a macOS/iOS pill toggle switch (40x22) at `(x, y)`.
+    pub fn draw_toggle_switch(&mut self, x: usize, y: usize, on: bool, active_col: Color) {
+        let track_col = if on { active_col } else { Color::SURFACE_HOVER };
+        self.draw_rounded_rect(x, y, 40, 22, 11, track_col, Some(Color::BORDER));
+        let knob_x = if on { x + 20 } else { x + 2 };
+        self.draw_rounded_rect(knob_x, y + 2, 18, 18, 9, Color::TEXT_PRIMARY, None);
     }
 
     #[inline(always)]

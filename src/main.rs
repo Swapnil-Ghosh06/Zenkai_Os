@@ -17,6 +17,7 @@ pub mod font_aa;
 pub mod gop;
 pub mod hw;
 pub mod memory;
+pub mod mouse;
 pub mod pkg;
 pub mod r19;
 pub mod readyq;
@@ -30,7 +31,7 @@ pub mod timer;
 use uefi::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;
 
-use crate::boot_screen::run_visual_boot_sequence;
+use crate::boot_screen::{run_visual_boot_sequence, BootAction};
 use crate::console::GLOBAL_CONSOLE;
 use crate::desktop::Desktop;
 use crate::gop::Framebuffer;
@@ -95,7 +96,12 @@ fn main() -> Status {
             hw.gop_height = fb.height;
             kok!("GOP", "Layer 2: GOP Framebuffer detected ({}x{}, stride={})", fb.width, fb.height, fb.stride);
 
-            run_visual_boot_sequence(&mut fb, &mut hw);
+            let boot_action = run_visual_boot_sequence(&mut fb, &mut hw);
+            if boot_action == BootAction::Recovery {
+                kwarn!("BOOT", "Recovery Mode selected by user.");
+            } else if boot_action == BootAction::FirmwareShell {
+                kinfo!("BOOT", "Firmware Shell mode selected by user.");
+            }
 
             // Attach framebuffer to console, keeping paint_fb=false during batch logging
             // so all logs go to UART serial + terminal history without flickering.
@@ -123,7 +129,7 @@ fn main() -> Status {
 
     if has_gop {
         let mut desktop = Desktop::new();
-        desktop.run(&mut shell, &mut services, &hw);
+        desktop.run(&mut shell, &mut services, &mut hw);
     }
 
     kok!("KERNEL", "Zenkai OS shutting down cleanly. Goodbye!");

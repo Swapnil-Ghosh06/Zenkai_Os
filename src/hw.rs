@@ -69,6 +69,8 @@ pub struct HardwareInfo {
     pub pci_devices: Vec<PciDevice>,
     pub boot_start_tsc: u64,
     pub boot_stages: Vec<BootStageTiming>,
+    pub debug_logging: bool,
+    pub turbo_mode: bool,
 }
 
 impl HardwareInfo {
@@ -83,6 +85,8 @@ impl HardwareInfo {
             pci_devices: Vec::new(),
             boot_start_tsc: read_tsc(),
             boot_stages: Vec::new(),
+            debug_logging: false,
+            turbo_mode: true,
         }
     }
 
