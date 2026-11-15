@@ -120,5 +120,23 @@ impl FreeListAllocator {
             current = curr.next;
         }
     }
-}
 
+    pub fn block_stats(&self) -> (usize, usize, usize) {
+        let mut total_blocks = 0;
+        let mut free_blocks = 0;
+        let mut max_free = 0;
+        let mut current = self.head;
+        while let Some(curr_ptr) = current {
+            let curr = unsafe { &*curr_ptr };
+            total_blocks += 1;
+            if curr.is_free {
+                free_blocks += 1;
+                if curr.size > max_free {
+                    max_free = curr.size;
+                }
+            }
+            current = curr.next;
+        }
+        (total_blocks, free_blocks, max_free)
+    }
+}

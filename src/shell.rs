@@ -1,7 +1,8 @@
 //! Zenkai OS - Interactive Kernel Shell & Command Dispatcher
 //!
 //! Author: Swapnil Ghosh 25BTRCL267 AIML-E
-//! Supports CA-6 kernel diagnostics, R19 benchmarks, APTITUDE (apt), Snapstore, WiFi/LAN & Hardware info.
+//! Supports CA-6 kernel diagnostics, R19 benchmarks, dynamic task management,
+//! APTITUDE (apt), Snapstore, WiFi/LAN & Hardware info.
 
 extern crate alloc;
 
@@ -13,13 +14,14 @@ use crate::r19::run_r19_full_benchmark;
 use crate::sched::Scheduler;
 use crate::sync::run_concurrency_stress_test;
 use crate::task::Task;
-use crate::timer::sleep_ms;
+use crate::timer::{read_tsc, sleep_ms};
 use crate::{kerror, kinfo, kok, kprintln, kwarn};
 
 pub struct Shell {
     pub frame_alloc: FrameAllocator,
     pub heap_alloc: FreeListAllocator,
     pub scheduler: Scheduler,
+    pub start_tsc: u64,
 }
 
 impl Shell {
@@ -36,6 +38,7 @@ impl Shell {
             frame_alloc: FrameAllocator::new(),
             heap_alloc: heap,
             scheduler: sched,
+            start_tsc: read_tsc(),
         }
     }
 
@@ -78,20 +81,31 @@ impl Shell {
         let cmd = parts.next().unwrap_or("");
         let arg1 = parts.next().unwrap_or("");
         let arg2 = parts.next().unwrap_or("");
+        let arg3 = parts.next().unwrap_or("");
 
         match cmd {
             "help" => self.cmd_help(),
             "info" | "uname" => self.cmd_info(hw),
+            "whoami" => self.cmd_whoami(),
+            "uptime" => self.cmd_uptime(),
             "r19" => self.cmd_r19(),
             "sched" => self.cmd_sched(),
             "alloc" => self.cmd_alloc(),
+            "free" | "mem" => self.cmd_mem(),
             "sync" => self.cmd_sync(),
-            "tasks" => self.cmd_tasks(),
+            "bench" => self.cmd_bench(),
+            "ps" | "top" | "tasks" => self.cmd_ps(),
+            "spawn" => self.cmd_spawn(arg1, arg2, arg3),
+            "kill" => self.cmd_kill(arg1),
+            "nice" => self.cmd_nice(arg1, arg2),
+            "quantum" => self.cmd_quantum(arg1),
+            "step" => self.cmd_step(arg1),
             "apt" | "aptitude" => self.cmd_apt(arg1, arg2, services),
             "snap" => self.cmd_snap(arg1, arg2, services),
             "wifi" | "net" => self.cmd_net(cmd, arg1, arg2, services),
             "ping" => self.cmd_ping(arg1, services),
-            "hw" | "pci" | "lscpu" => self.cmd_hw(hw),
+            "hw" | "pci" => self.cmd_hw(hw),
+            "lscpu" | "cpuid" => self.cmd_lscpu(hw),
             "boottime" => self.cmd_boottime(hw),
             "neofetch" => {
                 if services.is_apt_installed("neofetch") {
@@ -102,7 +116,7 @@ impl Shell {
             }
             "htop" => {
                 if services.is_apt_installed("htop") {
-                    self.cmd_tasks();
+                    self.cmd_ps();
                 } else {
                     kwarn!("SHELL", "Command 'htop' not found. Install via: apt install htop");
                 }
@@ -114,6 +128,9 @@ impl Shell {
                     kwarn!("SHELL", "Command 'tensor-bench' not found. Install via: apt install tensor-bench");
                 }
             }
+            "ls" => self.cmd_ls(arg1),
+            "cat" => self.cmd_cat(arg1, hw, services),
+            "echo" => self.cmd_echo(trimmed),
             "clear" => self.cmd_clear(),
             "reboot" => {
                 kok!("KERNEL", "Initiating clean system reboot...");
@@ -124,7 +141,7 @@ impl Shell {
                 return false;
             }
             unknown => {
-                kwarn!("SHELL", "Unknown command: '{}'. Type 'help' for command list.", unknown);
+                kwarn!("SHELL", "Unknown command: '{}'. Type 'help' for available commands.", unknown);
             }
         }
         true
@@ -133,18 +150,256 @@ impl Shell {
     fn cmd_help(&self) {
         kprintln!();
         kinfo!("HELP", "================ Zenkai OS Shell Commands ================");
-        kprintln!("  apt / aptitude   - Package manager (apt list | install <pkg> | remove <pkg>)");
-        kprintln!("  snap             - Snapstore CLI (snap list | install <app>)");
-        kprintln!("  wifi / net / ping- Network manager (wifi | net | ping <host>)");
-        kprintln!("  hw / pci         - Inspect CPUID & PCI laptop hardware compatibility");
-        kprintln!("  boottime         - Display component-wise boot time progression");
-        kprintln!("  r19              - Run Swapnil's R19 AI/ML Page Replacement Benchmarks");
-        kprintln!("  sched / tasks    - Run Round-Robin scheduler & inspect PCBs");
-        kprintln!("  alloc / sync     - Test 4KB Frame/Heap Allocator & SpinLock");
-        kprintln!("  info / clear     - System specs / clear terminal");
-        kprintln!("  Tips: Press F1-F6 (or Tab) anytime to switch Desktop GUI Views!");
+        kprintln!("  Process & Scheduler Control:");
+        kprintln!("    ps / top         - Display active Process Control Blocks (PCBs)");
+        kprintln!("    spawn <n> <p> <b>- Spawn task: name <n>, priority <p> (1..10), burst <b>");
+        kprintln!("    kill <pid>       - Terminate task by Process ID");
+        kprintln!("    nice <pid> <prio>- Dynamically adjust task priority (1..10)");
+        kprintln!("    quantum <ticks>  - Tune Round Robin time-slice quantum");
+        kprintln!("    step [n]         - Execute 1 or N scheduler dispatch steps");
+        kprintln!("    sched            - Run complete Round-Robin benchmark cycle");
+        kprintln!();
+        kprintln!("  Memory & Concurrency Diagnostics:");
+        kprintln!("    free / mem       - View physical 4KB frame pool & dynamic heap telemetry");
+        kprintln!("    alloc            - Execute frame allocation & FreeList heap tests");
+        kprintln!("    sync             - Run SpinLock atomic concurrency stress test");
+        kprintln!("    bench            - Run comprehensive multi-subsystem benchmark");
+        kprintln!("    r19              - Execute R19 AI/ML Page Replacement Research Suite");
+        kprintln!();
+        kprintln!("  System & Packages:");
+        kprintln!("    apt / aptitude   - Package manager (apt list | install <pkg> | remove <pkg>)");
+        kprintln!("    snap             - Snapstore CLI (snap list | install <app>)");
+        kprintln!("    wifi / net / ping- Network manager (wifi | net | ping <host>)");
+        kprintln!("    hw / lscpu       - Inspect CPUID, APIC, AVX & PCI device telemetry");
+        kprintln!("    uptime / whoami  - Show system uptime, cycles & user identity");
+        kprintln!("    ls / cat <path>  - Inspect virtual /proc filesystem entries");
+        kprintln!("    neofetch / info  - Display system banner & specifications");
+        kprintln!("    clear / reboot   - Clear console / restart system");
         kinfo!("HELP", "==========================================================");
         kprintln!();
+    }
+
+    fn cmd_whoami(&self) {
+        kinfo!("USER", "Swapnil Ghosh (Roll No: 25BTRCL267, Class: AIML-E)");
+        kinfo!("USER", "Course: 25PCCS201 - Operating Systems | Faculty: Dr. Sujeet S. Jagtap");
+        kinfo!("USER", "Project: Zenkai OS (Flagship CA-6 Micro-OS with R19 Research)");
+    }
+
+    fn cmd_uptime(&self) {
+        let current_tsc = read_tsc();
+        let elapsed_cycles = current_tsc.saturating_sub(self.start_tsc);
+        // Approximate 2.5 GHz clock
+        let approx_sec = elapsed_cycles / 2_500_000_000;
+        let mins = approx_sec / 60;
+        let secs = approx_sec % 60;
+        kinfo!("UPTIME", "System Uptime: {}m {}s ({} TSC cycles elapsed)", mins, secs, elapsed_cycles);
+        kinfo!("UPTIME", "Current Scheduler Ticks: {} | Context Switches: {}", self.scheduler.total_ticks, self.scheduler.total_context_switches);
+    }
+
+    fn cmd_ps(&self) {
+        kprintln!();
+        kinfo!("PROCESS", "Zenkai OS Process Control Table (PID List):");
+        kprintln!("  {:<5} | {:<16} | {:<8} | {:<11} | {:<10} | {:<8} | {:<8}",
+            "PID", "COMMAND", "PRIORITY", "STATE", "BURST_LEFT", "RUNTIME", "SWITCHES");
+        kprintln!("  -----------------------------------------------------------------------------");
+
+        if let Some(task) = &self.scheduler.current_task {
+            kprintln!("  {:<5} | {:<16} | {:<8} | {:<11} | {:<10} | {:<8} | {:<8}",
+                task.pid, task.name(), task.priority, task.state.as_str(), task.burst_remaining, task.total_runtime, task.context_switches);
+        }
+
+        for task in self.scheduler.ready_queue.iter() {
+            kprintln!("  {:<5} | {:<16} | {:<8} | {:<11} | {:<10} | {:<8} | {:<8}",
+                task.pid, task.name(), task.priority, task.state.as_str(), task.burst_remaining, task.total_runtime, task.context_switches);
+        }
+
+        let total_active = self.scheduler.ready_queue.len() + if self.scheduler.current_task.is_some() { 1 } else { 0 };
+        kinfo!("PROCESS", "Total Active Tasks: {} | Quantum: {} ticks", total_active, self.scheduler.quantum);
+        kprintln!();
+    }
+
+    fn cmd_spawn(&mut self, name: &str, prio_str: &str, burst_str: &str) {
+        if name.is_empty() {
+            kwarn!("SPAWN", "Usage: spawn <task_name> <priority:1..10> <burst_ticks>");
+            return;
+        }
+        let prio = prio_str.parse::<u8>().unwrap_or(5).clamp(1, 10);
+        let burst = burst_str.parse::<usize>().unwrap_or(10).clamp(1, 100);
+
+        let pid = self.scheduler.spawn(name, prio, burst);
+        kok!("SPAWN", "Spawned task '{}' with PID {} (Priority: {}, Burst: {} ticks).", name, pid, prio, burst);
+    }
+
+    fn cmd_kill(&mut self, pid_str: &str) {
+        if let Ok(pid) = pid_str.parse::<usize>() {
+            if self.scheduler.kill(pid) {
+                kok!("KILL", "Terminated process PID {}.", pid);
+            } else {
+                kwarn!("KILL", "Process PID {} not found in active task table.", pid);
+            }
+        } else {
+            kwarn!("KILL", "Usage: kill <pid>");
+        }
+    }
+
+    fn cmd_nice(&mut self, pid_str: &str, prio_str: &str) {
+        if let (Ok(pid), Ok(prio)) = (pid_str.parse::<usize>(), prio_str.parse::<u8>()) {
+            let clamped = prio.clamp(1, 10);
+            if self.scheduler.set_nice(pid, clamped) {
+                kok!("NICE", "Set priority of PID {} to {}.", pid, clamped);
+            } else {
+                kwarn!("NICE", "Process PID {} not found.", pid);
+            }
+        } else {
+            kwarn!("NICE", "Usage: nice <pid> <priority:1..10>");
+        }
+    }
+
+    fn cmd_quantum(&mut self, q_str: &str) {
+        if let Ok(q) = q_str.parse::<usize>() {
+            if q > 0 && q <= 50 {
+                self.scheduler.set_quantum(q);
+                kok!("QUANTUM", "Round Robin time quantum updated to {} ticks.", q);
+            } else {
+                kwarn!("QUANTUM", "Quantum must be between 1 and 50 ticks.");
+            }
+        } else {
+            kinfo!("QUANTUM", "Current Round Robin quantum: {} ticks. (Usage: quantum <ticks>)", self.scheduler.quantum);
+        }
+    }
+
+    fn cmd_step(&mut self, steps_str: &str) {
+        let count = steps_str.parse::<usize>().unwrap_or(1).clamp(1, 30);
+        for _ in 0..count {
+            if let Some((name, pid, state)) = self.scheduler.schedule_step() {
+                kinfo!("STEP", "Dispatched PID {:<2} ({:<15}) -> State: {:?}", pid, name, state);
+            } else {
+                kinfo!("STEP", "Ready queue is empty. CPU is Idle.");
+                break;
+            }
+        }
+    }
+
+    fn cmd_mem(&self) {
+        kprintln!();
+        kinfo!("MEM", "================ Memory Subsystem Telemetry ================");
+        let total_f = self.frame_alloc.total_frames();
+        let alloc_f = self.frame_alloc.allocated_frames();
+        let free_f = self.frame_alloc.free_frames();
+        let frame_kb = (total_f * crate::memory::PAGE_SIZE) / 1024;
+        let free_kb = (free_f * crate::memory::PAGE_SIZE) / 1024;
+        kprintln!("  Physical Frame Pool (4KB Pages):");
+        kprintln!("    Total Frames    : {:>6} ({} KB)", total_f, frame_kb);
+        kprintln!("    Allocated Frames: {:>6} ({} KB)", alloc_f, (alloc_f * crate::memory::PAGE_SIZE) / 1024);
+        kprintln!("    Free Frames     : {:>6} ({} KB)", free_f, free_kb);
+        kprintln!();
+
+        let (total_blocks, free_blocks, max_free) = self.heap_alloc.block_stats();
+        kprintln!("  FreeList Dynamic Heap Allocator (64KB Pool):");
+        kprintln!("    Total Capacity  : {:>6} bytes", crate::allocator::HEAP_SIZE);
+        kprintln!("    Active Allocated: {:>6} bytes", self.heap_alloc.total_allocated);
+        kprintln!("    Peak Allocated  : {:>6} bytes", self.heap_alloc.peak_allocated);
+        kprintln!("    Total Blocks    : {:>6}", total_blocks);
+        kprintln!("    Free Blocks     : {:>6}", free_blocks);
+        kprintln!("    Largest Free Blk: {:>6} bytes", max_free);
+        kinfo!("MEM", "============================================================");
+        kprintln!();
+    }
+
+    fn cmd_bench(&mut self) {
+        kprintln!();
+        kinfo!("BENCH", "Starting Zenkai OS Unified Micro-Kernel Benchmark...");
+        sleep_ms(100);
+
+        // 1. Memory Frame Allocation Speed
+        let t0 = read_tsc();
+        let mut frames = [None; 32];
+        for i in 0..32 {
+            frames[i] = self.frame_alloc.allocate_frame();
+        }
+        for f in frames.iter_mut() {
+            if let Some(fr) = f.take() {
+                self.frame_alloc.deallocate_frame(fr);
+            }
+        }
+        let t1 = read_tsc();
+        kok!("BENCH", "1. Frame Allocator: 32 alloc/dealloc in {} cycles", t1.saturating_sub(t0));
+
+        // 2. SpinLock Concurrency
+        let t2 = read_tsc();
+        let passed = run_concurrency_stress_test();
+        let t3 = read_tsc();
+        kok!("BENCH", "2. SpinLock Test: 10,000 atomic iterations in {} cycles (Passed: {})", t3.saturating_sub(t2), passed);
+
+        // 3. Scheduling Dispatch
+        let t4 = read_tsc();
+        let initial_cs = self.scheduler.total_context_switches;
+        for _ in 0..16 {
+            self.scheduler.schedule_step();
+        }
+        let t5 = read_tsc();
+        kok!("BENCH", "3. Scheduler Dispatch: 16 dispatch steps ({} context switches) in {} cycles",
+            self.scheduler.total_context_switches - initial_cs, t5.saturating_sub(t4));
+
+        kok!("BENCH", "Unified benchmark suite completed successfully!");
+        kprintln!();
+    }
+
+    fn cmd_ls(&self, path: &str) {
+        let p = if path.is_empty() { "/proc" } else { path };
+        if p == "/proc" || p == "proc" {
+            kinfo!("LS", "Contents of /proc:");
+            kprintln!("  cpuinfo   meminfo   uptime   version   schedstat   pci");
+        } else {
+            kwarn!("LS", "Path '{}' not found. Available virtual directory: /proc", p);
+        }
+    }
+
+    fn cmd_cat(&self, file: &str, hw: &HardwareInfo, _services: &SystemServices) {
+        match file {
+            "/proc/version" | "version" => {
+                kprintln!("Zenkai OS version 0.9.2 (x86_64-unknown-uefi) (rustc 1.82+)");
+                kprintln!("Author: Swapnil Ghosh 25BTRCL267 (AIML-E, Jain University)");
+            }
+            "/proc/uptime" | "uptime" => {
+                self.cmd_uptime();
+            }
+            "/proc/meminfo" | "meminfo" => {
+                self.cmd_mem();
+            }
+            "/proc/cpuinfo" | "cpuinfo" => {
+                self.cmd_lscpu(hw);
+            }
+            "/proc/pci" | "pci" => {
+                self.cmd_hw(hw);
+            }
+            "/proc/schedstat" | "schedstat" => {
+                kinfo!("PROC", "Scheduler Statistics:");
+                kprintln!("  Total Ticks           : {}", self.scheduler.total_ticks);
+                kprintln!("  Total Context Switches: {}", self.scheduler.total_context_switches);
+                kprintln!("  Quantum Slices        : {} ticks", self.scheduler.quantum);
+            }
+            _ => kwarn!("CAT", "File '{}' not found. Try: cat /proc/version | uptime | meminfo | cpuinfo", file),
+        }
+    }
+
+    fn cmd_lscpu(&self, hw: &HardwareInfo) {
+        kprintln!();
+        kinfo!("CPU", "Processor Architecture & Telemetry:");
+        kprintln!("  Architecture : x86_64 (64-bit Long Mode)");
+        kprintln!("  Vendor String: {}", hw.cpu_vendor);
+        kprintln!("  APIC Ready   : {}", if hw.has_apic { "Enabled (Local APIC)" } else { "Disabled" });
+        kprintln!("  SIMD Features: SSE2={}, AVX={}", hw.has_sse2, hw.has_avx);
+        kprintln!("  Time Counter : rdtsc (Cycle Counter Monotonic)");
+        kprintln!();
+    }
+
+    fn cmd_echo(&self, raw: &str) {
+        if let Some(idx) = raw.find(' ') {
+            kprintln!("{}", &raw[idx+1..]);
+        } else {
+            kprintln!();
+        }
     }
 
     fn cmd_apt(&self, sub: &str, pkg: &str, services: &mut SystemServices) {
@@ -340,18 +595,6 @@ impl Shell {
             kok!("SYNC", "SpinLock stress test PASSED! Mutual exclusion maintained with 0 race conditions.");
         } else {
             kerror!("SYNC", "SpinLock stress test FAILED! Data corruption detected.");
-        }
-    }
-
-    fn cmd_tasks(&self) {
-        kinfo!("TASKS", "Current Process Control Blocks (PCBs):");
-        kprintln!("  {:<6} | {:<16} | {:<8} | {:<10}", "PID", "Task Name", "Priority", "State");
-        kprintln!("  --------------------------------------------------");
-        for task in self.scheduler.ready_queue.iter() {
-            kprintln!("  {:<6} | {:<16} | {:<8} | {:?}", task.pid, task.name, task.priority, task.state);
-        }
-        if let Some(task) = &self.scheduler.current_task {
-            kprintln!("  {:<6} | {:<16} | {:<8} | {:?}", task.pid, task.name, task.priority, task.state);
         }
     }
 
