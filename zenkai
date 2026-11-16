@@ -49,7 +49,8 @@ case "$MODE" in
         echo -e "\x1b[33m[!] Tip: A macOS Virtual Machine window will open displaying the graphical boot screen.\x1b[0m\n"
         "$QEMU_BIN" \
             -machine q35 \
-            -m 256M \
+            -m 512M \
+            -vga std \
             -drive if=pflash,format=raw,readonly=on,file="$OVMF_PATH" \
             -drive format=raw,file=fat:rw:"$ESP_DIR" \
             -serial stdio \
@@ -72,7 +73,26 @@ case "$MODE" in
         echo -e "\x1b[36m[*] Running Automated Verification Suite...\x1b[0m"
         python3 "$PROJECT_DIR/test_runner.py"
         ;;
-    iso|debian)
+    live|iso|iso-boot)
+        if [ ! -f "$PROJECT_DIR/zenkai_os_live.iso" ]; then
+            echo -e "\x1b[33m[*] zenkai_os_live.iso not found. Building it now...\x1b[0m"
+            bash "$PROJECT_DIR/build_iso.sh"
+        fi
+        echo -e "\x1b[32m[*] Booting actual Zenkai OS Live ISO (Hybrid UEFI image)...\x1b[0m"
+        echo -e "\x1b[36m[+] Featuring GNU GRUB 2.12 UEFI Bootloader & 5-Stage Animated Splash\x1b[0m"
+        echo -e "\x1b[33m[!] Author: Swapnil Ghosh 25BTRCL267 AIML-E\x1b[0m\n"
+        "$QEMU_BIN" \
+            -machine q35 \
+            -m 512M \
+            -vga std \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_PATH" \
+            -cdrom "$PROJECT_DIR/zenkai_os_live.iso" \
+            -boot d \
+            -serial stdio \
+            -display cocoa \
+            -no-reboot
+        ;;
+    iso-doc|debian)
         echo -e "\x1b[36m[*] Displaying Debian Mini-OS ISO Packaging & Boot-Time Analysis...\x1b[0m"
         cat "$PROJECT_DIR/ISO_PACKAGING_AND_BOOT_ANALYSIS.md"
         ;;
@@ -81,8 +101,11 @@ case "$MODE" in
         echo "Usage: ./zenkai [command]"
         echo ""
         echo "Commands:"
+        echo "  ./zenkai live     - Boot actual Live ISO with GNU GRUB boot menu & 5-stage splash"
         echo "  ./zenkai          - Launch Zenkai OS in Virtual Machine Window (Cocoa GUI)"
         echo "  ./zenkai terminal - Launch Zenkai OS in Headless Terminal mode"
+        echo "  ./zenkai test     - Run automated verification tests"
+        echo "  ./zenkai help     - Show this help menu"
         echo "  ./zenkai test     - Run automated verification tests"
         echo "  ./zenkai iso      - View Debian Mini-OS ISO packaging and boot-time benchmarks"
         echo "  ./zenkai help     - Show this help menu"

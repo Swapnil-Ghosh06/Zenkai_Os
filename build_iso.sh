@@ -102,6 +102,7 @@ terminal_output console serial
 
 # Graphics display (for real hardware/VirtualBox GUI)
 set gfxmode=1280x800,1024x768,auto
+set gfxpayload=keep
 insmod all_video
 insmod gfxterm
 terminal_output console serial gfxterm
@@ -117,6 +118,7 @@ echo "   Course: 25PCCS201 Operating Systems - CA-6"
 echo "============================================================"
 
 menuentry "  Zenkai OS 0.9.2  —  Boot Normal" --class zenkai --class os {
+    set gfxpayload=keep
     echo ""
     echo "  Starting Zenkai OS Rust Micro-Kernel..."
     echo "  Author: Swapnil Ghosh (25BTRCL267 AIML-E)"
@@ -127,6 +129,7 @@ menuentry "  Zenkai OS 0.9.2  —  Boot Normal" --class zenkai --class os {
 }
 
 menuentry "  Zenkai OS — Recovery / Debug Mode" --class recovery {
+    set gfxpayload=keep
     echo "  Starting Recovery Mode..."
     search --no-floppy --file --set=root /EFI/BOOT/ZENKAIOS.EFI
     chainloader /EFI/BOOT/ZENKAIOS.EFI
