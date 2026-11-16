@@ -7,6 +7,7 @@
 extern crate alloc;
 
 use crate::allocator::FreeListAllocator;
+use crate::ca_suite::{run_ca2_investigation, run_ca3_debugging_challenge, run_ca5_linux_systems_challenge};
 use crate::hw::HardwareInfo;
 use crate::memory::FrameAllocator;
 use crate::pkg::SystemServices;
@@ -68,7 +69,9 @@ impl Shell {
         self.cmd_sync();
         self.cmd_sched();
         self.cmd_r19();
-        kok!("BATCH", "All 6 micro-kernel layers and flagship R19 research passed 100%!");
+        run_ca3_debugging_challenge();
+        run_ca5_linux_systems_challenge();
+        kok!("BATCH", "All 6 micro-kernel layers + CA-2, CA-3, CA-5 suites passed 100%!");
     }
 
     pub fn dispatch(&mut self, line: &str, services: &mut SystemServices, hw: &HardwareInfo) -> bool {
@@ -88,7 +91,14 @@ impl Shell {
             "info" | "uname" => self.cmd_info(hw),
             "whoami" => self.cmd_whoami(),
             "uptime" => self.cmd_uptime(),
-            "r19" => self.cmd_r19(),
+            "r19" | "ca2" => self.cmd_r19(),
+            "ca3" => run_ca3_debugging_challenge(),
+            "ca5" => run_ca5_linux_systems_challenge(),
+            "ca" | "casuite" => {
+                run_ca2_investigation();
+                run_ca3_debugging_challenge();
+                run_ca5_linux_systems_challenge();
+            }
             "sched" => self.cmd_sched(),
             "alloc" => self.cmd_alloc(),
             "free" | "mem" => self.cmd_mem(),
@@ -164,7 +174,10 @@ impl Shell {
         kprintln!("    alloc            - Execute frame allocation & FreeList heap tests");
         kprintln!("    sync             - Run SpinLock atomic concurrency stress test");
         kprintln!("    bench            - Run comprehensive multi-subsystem benchmark");
-        kprintln!("    r19              - Execute R19 AI/ML Page Replacement Research Suite");
+        kprintln!("    r19 / ca2        - CA-2: R19 AI/ML Page Replacement Research Suite");
+        kprintln!("    ca3              - CA-3: Design & Debugging Challenge (LRU defect fix)");
+        kprintln!("    ca5              - CA-5: Linux Systems Challenge (Demand paging probe)");
+        kprintln!("    ca               - Run all Continuous Assessment suites (CA-2, 3, 5, 6)");
         kprintln!();
         kprintln!("  System & Packages:");
         kprintln!("    apt / aptitude   - Package manager (apt list | install <pkg> | remove <pkg>)");
@@ -349,7 +362,7 @@ impl Shell {
         let p = if path.is_empty() { "/proc" } else { path };
         if p == "/proc" || p == "proc" {
             kinfo!("LS", "Contents of /proc:");
-            kprintln!("  cpuinfo   meminfo   uptime   version   schedstat   pci");
+            kprintln!("  cpuinfo   meminfo   uptime   version   schedstat   pci   ca2   ca3   ca5");
         } else {
             kwarn!("LS", "Path '{}' not found. Available virtual directory: /proc", p);
         }
@@ -379,7 +392,16 @@ impl Shell {
                 kprintln!("  Total Context Switches: {}", self.scheduler.total_context_switches);
                 kprintln!("  Quantum Slices        : {} ticks", self.scheduler.quantum);
             }
-            _ => kwarn!("CAT", "File '{}' not found. Try: cat /proc/version | uptime | meminfo | cpuinfo", file),
+            "/proc/ca2" | "ca2" => {
+                run_ca2_investigation();
+            }
+            "/proc/ca3" | "ca3" => {
+                run_ca3_debugging_challenge();
+            }
+            "/proc/ca5" | "ca5" => {
+                run_ca5_linux_systems_challenge();
+            }
+            _ => kwarn!("CAT", "File '{}' not found. Try: cat /proc/version | uptime | meminfo | cpuinfo | ca2 | ca3 | ca5", file),
         }
     }
 

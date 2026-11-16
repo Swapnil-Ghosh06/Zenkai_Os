@@ -11,6 +11,7 @@ extern crate alloc;
 
 pub mod allocator;
 pub mod boot_screen;
+pub mod ca_suite;
 pub mod console;
 pub mod desktop;
 pub mod font_aa;
