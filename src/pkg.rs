@@ -45,6 +45,7 @@ pub struct SystemServices {
     pub wifi_connected: bool,
     pub wifi_ip: &'static str,
     pub active_ssid: &'static str,
+    pub custom_ssid: Option<alloc::string::String>,
     pub last_ping_ms: u32,
 }
 
@@ -83,8 +84,36 @@ impl SystemServices {
             wifi_connected: true,
             wifi_ip: "192.168.1.104/24",
             active_ssid: "Zenkai-Lab-5G",
+            custom_ssid: None,
             last_ping_ms: 14,
         }
+    }
+
+    pub fn get_active_ssid(&self) -> &str {
+        if let Some(custom) = &self.custom_ssid {
+            custom.as_str()
+        } else {
+            self.active_ssid
+        }
+    }
+
+    pub fn connect_custom_wifi(&mut self, ssid: &str) {
+        self.custom_ssid = Some(alloc::string::String::from(ssid));
+        self.wifi_connected = true;
+    }
+
+    pub fn dpkg_status(&self) -> alloc::string::String {
+        use alloc::format;
+        let mut out = alloc::string::String::new();
+        for pkg in &self.apt_packages {
+            if pkg.installed {
+                out.push_str(&format!(
+                    "Package: {}\nStatus: install ok installed\nPriority: optional\nSection: {}\nInstalled-Size: {}\nMaintainer: Swapnil Ghosh <25btrcl267@jainuniversity.ac.in>\nArchitecture: amd64\nVersion: {}\nDescription: {}\n\n",
+                    pkg.name, pkg.category, pkg.size_kb, pkg.version, pkg.description
+                ));
+            }
+        }
+        out
     }
 
     pub fn apt_installed_count(&self) -> usize {

@@ -10,12 +10,9 @@
 
 extern crate alloc;
 use alloc::collections::VecDeque;
-use alloc::vec;
-use alloc::vec::Vec;
 
 use crate::r19::{run_r19_full_benchmark, simulate_fifo, simulate_lru, simulate_opt};
-use crate::timer::read_tsc;
-use crate::{kerror, kinfo, kok, kprintln, kwarn};
+use crate::{kerror, kinfo, kok, kprintln};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // CA-2: OS Performance Investigation (R19 Research Topic)

@@ -112,11 +112,15 @@ impl Shell {
             "step" => self.cmd_step(arg1),
             "apt" | "aptitude" => self.cmd_apt(arg1, arg2, services),
             "snap" => self.cmd_snap(arg1, arg2, services),
-            "wifi" | "net" => self.cmd_net(cmd, arg1, arg2, services),
+            "wifi" | "net" => self.cmd_net(cmd, arg1, arg2, services, hw),
             "ping" => self.cmd_ping(arg1, services),
             "hw" | "pci" => self.cmd_hw(hw),
             "lscpu" | "cpuid" => self.cmd_lscpu(hw),
             "boottime" => self.cmd_boottime(hw),
+            "systemd-analyze" => self.cmd_systemd_analyze(arg1, hw),
+            "dpkg" => self.cmd_dpkg(arg1, arg2, services),
+            "ifconfig" | "ip" => self.cmd_ifconfig(services, hw),
+            "vim" | "vi" | "nano" => self.cmd_editor(arg1),
             "neofetch" => {
                 if services.is_apt_installed("neofetch") {
                     self.cmd_neofetch(services, hw);
@@ -181,11 +185,16 @@ impl Shell {
         kprintln!();
         kprintln!("  System & Packages:");
         kprintln!("    apt / aptitude   - Package manager (apt list | install <pkg> | remove <pkg>)");
+        kprintln!("    dpkg             - Query Debian package database (dpkg -l | dpkg -s <pkg>)");
         kprintln!("    snap             - Snapstore CLI (snap list | install <app>)");
-        kprintln!("    wifi / net / ping- Network manager (wifi | net | ping <host>)");
-        kprintln!("    hw / lscpu       - Inspect CPUID, APIC, AVX & PCI device telemetry");
+        kprintln!("    wifi / net / ping- Network manager (wifi scan | wifi connect <SSID> | ping <host>)");
+        kprintln!("    ifconfig / ip    - Display POSIX interfaces, IP/MAC addresses & packet telemetry");
+        kprintln!("    hw / lscpu       - Inspect CPUID, APIC, AVX & multi-bus PCI hardware telemetry");
+        kprintln!("    boottime         - View Faculty 5-stage component boot-time progression table");
+        kprintln!("    systemd-analyze  - Boot profiling (systemd-analyze time | blame | critical-chain)");
+        kprintln!("    vim / nano       - In-memory text editor & configuration viewer");
         kprintln!("    uptime / whoami  - Show system uptime, cycles & user identity");
-        kprintln!("    ls / cat <path>  - Inspect virtual /proc filesystem entries");
+        kprintln!("    ls / cat <path>  - Inspect virtual /proc, /etc & /var/lib/dpkg filesystem entries");
         kprintln!("    neofetch / info  - Display system banner & specifications");
         kprintln!("    clear / reboot   - Clear console / restart system");
         kinfo!("HELP", "==========================================================");
@@ -360,19 +369,43 @@ impl Shell {
 
     fn cmd_ls(&self, path: &str) {
         let p = if path.is_empty() { "/proc" } else { path };
-        if p == "/proc" || p == "proc" {
-            kinfo!("LS", "Contents of /proc:");
-            kprintln!("  cpuinfo   meminfo   uptime   version   schedstat   pci   ca2   ca3   ca5");
-        } else {
-            kwarn!("LS", "Path '{}' not found. Available virtual directory: /proc", p);
+        match p {
+            "/proc" | "proc" => {
+                kinfo!("LS", "Contents of /proc:");
+                kprintln!("  cpuinfo   meminfo   uptime   version   schedstat   pci   net   mounts   ca2   ca3   ca5");
+            }
+            "/etc" | "etc" => {
+                kinfo!("LS", "Contents of /etc:");
+                kprintln!("  apt/   network/   systemd/   fstab   hostname   issue   resolv.conf");
+            }
+            "/etc/apt" | "etc/apt" => {
+                kinfo!("LS", "Contents of /etc/apt:");
+                kprintln!("  sources.list   sources.list.d/   trusted.gpg.d/   apt.conf.d/");
+            }
+            "/etc/network" | "etc/network" => {
+                kinfo!("LS", "Contents of /etc/network:");
+                kprintln!("  interfaces   interfaces.d/   wpa_supplicant.conf");
+            }
+            "/var" | "/var/lib" | "/var/lib/dpkg" => {
+                kinfo!("LS", "Contents of /var/lib/dpkg:");
+                kprintln!("  status   available   info/   lock   updates/");
+            }
+            "/snap" | "snap" => {
+                kinfo!("LS", "Contents of /snap:");
+                kprintln!("  bin/   core22/   snapstore/   README");
+            }
+            _ => {
+                kwarn!("LS", "Path '{}' not found. Available virtual directories: /proc, /etc, /etc/apt, /etc/network, /var/lib/dpkg, /snap", p);
+            }
         }
     }
 
-    fn cmd_cat(&self, file: &str, hw: &HardwareInfo, _services: &SystemServices) {
+    fn cmd_cat(&self, file: &str, hw: &HardwareInfo, services: &SystemServices) {
         match file {
             "/proc/version" | "version" => {
                 kprintln!("Zenkai OS version 0.9.2 (x86_64-unknown-uefi) (rustc 1.82+)");
                 kprintln!("Author: Swapnil Ghosh 25BTRCL267 (AIML-E, Jain University)");
+                kprintln!("Target: x86_64-unknown-uefi (Bare-Metal UEFI / VirtualBox 7.x Compatible)");
             }
             "/proc/uptime" | "uptime" => {
                 self.cmd_uptime();
@@ -385,6 +418,42 @@ impl Shell {
             }
             "/proc/pci" | "pci" => {
                 self.cmd_hw(hw);
+            }
+            "/proc/net/dev" | "net/dev" => {
+                kprintln!("Inter-|   Receive                                                |  Transmit");
+                kprintln!(" face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed");
+                kprintln!("    lo: 168432      842    0    0    0     0          0         0   168432      842    0    0    0     0       0          0");
+                kprintln!("  eth0: 984210     1420    0    0    0     0          0         0   512400      854    0    0    0     0       0          0");
+                kprintln!(" wlan0: 1852030    2419    0    0    0     0          0         0   840190     1204    0    0    0     0       0          0");
+            }
+            "/proc/mounts" | "mounts" => {
+                kprintln!("rootfs / rootfs rw,size=524288k,nr_inodes=131072 0 0");
+                kprintln!("efivarfs /sys/firmware/efi/efivars efivarfs rw,nosuid,nodev,noexec 0 0");
+                kprintln!("proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0");
+                kprintln!("/dev/loop0 /snap/core22/current squashfs ro,nodev,relatime 0 0");
+                kprintln!("/dev/loop1 /snap/snapstore/current squashfs ro,nodev,relatime 0 0");
+            }
+            "/etc/apt/sources.list" | "sources.list" => {
+                kprintln!("# Zenkai OS Debian Mirror Configuration (bookworm-stable)");
+                kprintln!("deb http://deb.debian.org/debian bookworm main contrib non-free");
+                kprintln!("deb http://security.debian.org/debian-security bookworm-security main");
+                kprintln!("deb http://deb.zenkai-os.org/packages bookworm-backports main");
+            }
+            "/etc/network/interfaces" | "interfaces" => {
+                kprintln!("# /etc/network/interfaces - Zenkai OS Network Configuration");
+                kprintln!("auto lo");
+                kprintln!("iface lo inet loopback");
+                kprintln!();
+                kprintln!("auto eth0");
+                kprintln!("iface eth0 inet dhcp");
+                kprintln!();
+                kprintln!("auto wlan0");
+                kprintln!("iface wlan0 inet dhcp");
+                kprintln!("    wpa-ssid {}", services.get_active_ssid());
+                kprintln!("    wpa-key-mgmt WPA-PSK");
+            }
+            "/var/lib/dpkg/status" | "status" => {
+                kprintln!("{}", services.dpkg_status());
             }
             "/proc/schedstat" | "schedstat" => {
                 kinfo!("PROC", "Scheduler Statistics:");
@@ -401,7 +470,7 @@ impl Shell {
             "/proc/ca5" | "ca5" => {
                 run_ca5_linux_systems_challenge();
             }
-            _ => kwarn!("CAT", "File '{}' not found. Try: cat /proc/version | uptime | meminfo | cpuinfo | ca2 | ca3 | ca5", file),
+            _ => kwarn!("CAT", "File '{}' not found. Try: cat /proc/version | /etc/apt/sources.list | /etc/network/interfaces | /var/lib/dpkg/status | /proc/net/dev | /proc/mounts", file),
         }
     }
 
@@ -493,25 +562,253 @@ impl Shell {
         }
     }
 
-    fn cmd_net(&self, cmd: &str, sub: &str, arg: &str, services: &mut SystemServices) {
-        if cmd == "wifi" && sub == "connect" {
-            if let Ok(idx) = arg.parse::<usize>() {
-                if idx < services.wifi_networks.len() {
-                    services.connect_wifi_idx(idx);
-                    kok!("WIFI", "Connected to SSID '{}' ({})", services.active_ssid, services.wifi_ip);
-                    return;
-                }
+    fn cmd_net(&self, cmd: &str, sub: &str, arg: &str, services: &mut SystemServices, hw: &HardwareInfo) {
+        if cmd == "wifi" && sub == "scan" {
+            kinfo!("WIFI", "Scanning 802.11 channels (Ch 1..14 @ 2.4GHz, Ch 36..165 @ 5.0GHz)...");
+            sleep_ms(160);
+            kinfo!("WIFI", "Detected {} BSSID beacons on interface wlan0:", services.wifi_networks.len());
+            kprintln!("  {:<24} {:<18} {:<4} {:<9} {:<8} {:<16}", "SSID", "BSSID", "CH", "FREQ", "SIGNAL", "SECURITY");
+            kprintln!("  -------------------------------------------------------------------------------------");
+            let bssids = [
+                ("74:83:C2:4B:91:20", "36", "5.18 GHz", "-42 dBm"),
+                ("00:25:9C:12:34:56", "6",  "2.43 GHz", "-58 dBm"),
+                ("9E:F2:71:08:14:BC", "1",  "2.41 GHz", "-62 dBm"),
+                ("E4:8D:8C:77:21:44", "149", "5.74 GHz", "-74 dBm"),
+            ];
+            for (i, w) in services.wifi_networks.iter().enumerate() {
+                let mark = if w.connected && services.wifi_connected { "*" } else { " " };
+                let (bssid, ch, freq, dbm) = if i < bssids.len() { bssids[i] } else { ("AA:BB:CC:DD:EE:FF", "1", "2.41 GHz", "-70 dBm") };
+                kprintln!("  [{}] {} {:<21} {:<18} {:<4} {:<9} {:<8} {:<16}",
+                    i, mark, w.ssid, bssid, ch, freq, dbm, w.security);
             }
-            kwarn!("WIFI", "Usage: wifi connect <0..{}>", services.wifi_networks.len() - 1);
+            kprintln!("  (Tip: Type 'wifi connect <0..3>' or 'wifi connect <SSID_NAME>' to associate).");
             return;
         }
-        kinfo!("NET", "eth0 (LAN):  {} | IP: {}", if services.lan_connected { "UP (1000Mb/s)" } else { "DOWN" }, services.lan_ip);
-        kinfo!("NET", "wlan0 (WiFi): {} | SSID: {} | IP: {}", if services.wifi_connected { "UP (802.11ax)" } else { "DOWN" }, services.active_ssid, services.wifi_ip);
-        kprintln!("  Available WiFi SSIDs:");
+
+        if cmd == "wifi" && sub == "connect" {
+            if arg.is_empty() {
+                kwarn!("WIFI", "Usage: wifi connect <index: 0..3> OR wifi connect <custom_SSID>");
+                return;
+            }
+
+            let target_ssid: alloc::string::String = if let Ok(idx) = arg.parse::<usize>() {
+                if idx < services.wifi_networks.len() {
+                    services.connect_wifi_idx(idx);
+                    alloc::string::String::from(services.wifi_networks[idx].ssid)
+                } else {
+                    kwarn!("WIFI", "Invalid index. Available range: 0..{}", services.wifi_networks.len() - 1);
+                    return;
+                }
+            } else {
+                services.connect_custom_wifi(arg);
+                alloc::string::String::from(arg)
+            };
+
+            kinfo!("WPA", "Sending 802.11 Probe Request to '{}'...", target_ssid);
+            sleep_ms(80);
+            kinfo!("WPA", "802.11 Authentication & Association accepted (AID=1).");
+            sleep_ms(80);
+            kinfo!("WPA", "Initiating 4-Way WPA2/WPA3 Handshake:");
+            kinfo!("WPA", "  -> Message 1/4 (ANonce received from AP)");
+            sleep_ms(50);
+            kinfo!("WPA", "  <- Message 2/4 (SNonce + MIC sent)");
+            sleep_ms(50);
+            kinfo!("WPA", "  -> Message 3/4 (GTK installed)");
+            sleep_ms(50);
+            kinfo!("WPA", "  <- Message 4/4 (Pairwise Master Key PTK verified)");
+            kok!("WPA", "802.11 Link UP! Negotiated 802.11ax (Wi-Fi 6, 1201 Mbps, WPA3-SAE).");
+            sleep_ms(70);
+            kinfo!("DHCP", "Broadcasting DHCPDISCOVER on interface wlan0...");
+            sleep_ms(90);
+            kinfo!("DHCP", "Received DHCPOFFER: 192.168.1.104 from 192.168.1.1");
+            sleep_ms(50);
+            kinfo!("DHCP", "Sending DHCPREQUEST for 192.168.1.104...");
+            sleep_ms(70);
+            kok!("DHCP", "DHCPACK received. Lease duration: 86400s (Gateway: 192.168.1.1, DNS: 8.8.8.8)");
+            kok!("WIFI", "Connected to SSID '{}' [IP: {}]", services.get_active_ssid(), services.wifi_ip);
+            return;
+        }
+
+        if cmd == "wifi" && sub == "disconnect" {
+            services.wifi_connected = false;
+            kok!("WIFI", "Interface wlan0 disconnected from AP.");
+            return;
+        }
+
+        // Default status display
+        kinfo!("NET", "Network Subsystem Status (POSIX Interfaces):");
+        if let Some(nic) = &hw.lan_adapter {
+            kinfo!("NET", "Hardware LAN NIC : {}", nic);
+        }
+        if let Some(wifi) = &hw.wifi_adapter {
+            kinfo!("NET", "Hardware WiFi NIC: {}", wifi);
+        }
+        kprintln!();
+        kinfo!("NET", "eth0 (LAN):  {} | IP: {} | MAC: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            if services.lan_connected { "UP (1000Mb/s Full-Duplex)" } else { "DOWN" },
+            services.lan_ip,
+            hw.detected_mac[0], hw.detected_mac[1], hw.detected_mac[2],
+            hw.detected_mac[3], hw.detected_mac[4], hw.detected_mac[5]);
+        kinfo!("NET", "wlan0 (WiFi): {} | SSID: '{}' | IP: {}",
+            if services.wifi_connected { "UP (802.11ax Wi-Fi 6)" } else { "DOWN" },
+            services.get_active_ssid(),
+            services.wifi_ip);
+        kprintln!();
+        kprintln!("  Configured WiFi Access Points:");
         for (i, w) in services.wifi_networks.iter().enumerate() {
-            let mark = if w.connected { "*" } else { " " };
+            let mark = if w.connected && services.wifi_connected { "*" } else { " " };
             kprintln!("  [{}] {} {:<24} {}%  {:<8} {}", i, mark, w.ssid, w.signal_pct, w.band, w.security);
         }
+        kprintln!("  Commands: 'wifi scan', 'wifi connect <0..3>', 'wifi connect <SSID>', 'ping <host>'");
+    }
+
+    fn cmd_ifconfig(&self, services: &SystemServices, hw: &HardwareInfo) {
+        kprintln!();
+        kprintln!("eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
+        kprintln!("        inet {}  netmask 255.255.255.0  broadcast 10.0.2.255", services.lan_ip);
+        kprintln!("        inet6 fe80::{:02x}{:02x}:{:02x}ff:fe{:02x}:{:02x}{:02x}  prefixlen 64  scopeid 0x20<link>",
+            hw.detected_mac[0], hw.detected_mac[1], hw.detected_mac[2],
+            hw.detected_mac[3], hw.detected_mac[4], hw.detected_mac[5]);
+        kprintln!("        ether {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}  txqueuelen 1000  (Ethernet)",
+            hw.detected_mac[0], hw.detected_mac[1], hw.detected_mac[2],
+            hw.detected_mac[3], hw.detected_mac[4], hw.detected_mac[5]);
+        kprintln!("        RX packets 1420  bytes 984210 (961.1 KB)");
+        kprintln!("        RX errors 0  dropped 0  overruns 0  frame 0");
+        kprintln!("        TX packets 854  bytes 512400 (500.3 KB)");
+        kprintln!("        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0");
+        if let Some(nic) = &hw.lan_adapter {
+            kprintln!("        device memory 0xf0000000-0xf001ffff  ({})", nic);
+        }
+        kprintln!();
+
+        kprintln!("wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
+        kprintln!("        inet {}  netmask 255.255.255.0  broadcast 192.168.1.255", services.wifi_ip);
+        kprintln!("        inet6 fe80::7683:c2ff:fe4b:9120  prefixlen 64  scopeid 0x20<link>");
+        kprintln!("        ether 74:83:c2:4b:91:20  txqueuelen 1000  (IEEE 802.11ax)");
+        kprintln!("        RX packets 2419  bytes 1852030 (1.8 MB)");
+        kprintln!("        RX errors 0  dropped 0  overruns 0  frame 0");
+        kprintln!("        TX packets 1204  bytes 840190 (820.5 KB)");
+        kprintln!("        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0");
+        kprintln!("        SSID: '{}'  Freq: 5.18 GHz  Signal: -42 dBm", services.get_active_ssid());
+        if let Some(wifi) = &hw.wifi_adapter {
+            kprintln!("        driver: iwlwifi / nl80211  ({})", wifi);
+        }
+        kprintln!();
+
+        kprintln!("lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536");
+        kprintln!("        inet 127.0.0.1  netmask 255.0.0.0");
+        kprintln!("        inet6 ::1  prefixlen 128  scopeid 0x10<host>");
+        kprintln!("        loop  txqueuelen 1000  (Local Loopback)");
+        kprintln!("        RX packets 842  bytes 168432 (164.4 KB)");
+        kprintln!("        TX packets 842  bytes 168432 (164.4 KB)");
+        kprintln!();
+    }
+
+    fn cmd_dpkg(&self, sub: &str, pkg: &str, services: &SystemServices) {
+        match sub {
+            "-l" | "--list" | "list" | "" => {
+                kprintln!("Desired=Unknown/Install/Remove/Purge/Hold");
+                kprintln!("| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend");
+                kprintln!("|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)");
+                kprintln!("||/ Name             Version         Architecture Description");
+                kprintln!("+++-================-===============-============-=========================================");
+                for p in &services.apt_packages {
+                    let status_flag = if p.installed { "ii" } else { "un" };
+                    kprintln!("{}  {:<16} {:<15} amd64        {}", status_flag, p.name, p.version, p.description);
+                }
+                kprintln!();
+            }
+            "-s" | "--status" | "status" => {
+                if pkg.is_empty() {
+                    kwarn!("DPKG", "Usage: dpkg -s <package_name>");
+                    return;
+                }
+                if let Some(p) = services.apt_packages.iter().find(|p| p.name == pkg) {
+                    let st = if p.installed { "install ok installed" } else { "deinstall ok config-files" };
+                    kprintln!("Package: {}", p.name);
+                    kprintln!("Status: {}", st);
+                    kprintln!("Priority: optional");
+                    kprintln!("Section: {}", p.category);
+                    kprintln!("Installed-Size: {}", p.size_kb);
+                    kprintln!("Maintainer: Swapnil Ghosh <25btrcl267@jainuniversity.ac.in>");
+                    kprintln!("Architecture: amd64");
+                    kprintln!("Version: {}", p.version);
+                    kprintln!("Description: {}", p.description);
+                    kprintln!();
+                } else {
+                    kwarn!("DPKG", "dpkg-query: package '{}' is not installed and no info is available", pkg);
+                }
+            }
+            _ => kwarn!("DPKG", "Usage: dpkg -l (list all) | dpkg -s <package_name> (status query)"),
+        }
+    }
+
+    fn cmd_systemd_analyze(&self, sub: &str, _hw: &HardwareInfo) {
+        match sub {
+            "time" | "" => {
+                kprintln!();
+                kinfo!("SYSTEMD", "Startup finished in 184ms (firmware) + 42ms (loader) + 810ms (kernel) + 384ms (userspace) = 1.420s (total)");
+                kinfo!("SYSTEMD", "graphical.target reached after 4.150s in userspace (all 5 CA-6 components loaded).");
+                kprintln!();
+            }
+            "blame" => {
+                kprintln!();
+                kinfo!("SYSTEMD", "Unit initialization duration sorted by latency:");
+                kprintln!("  1.240s snapd.service (squashfs loop mount & AppArmor confinement)");
+                kprintln!("   760ms networking.service (802.11ax wpa_supplicant & DHCP client)");
+                kprintln!("   470ms udev-pci.service (PCI multi-bus scan & GOP framebuffer initialization)");
+                kprintln!("   260ms apt-cache.service (dpkg status catalog & package database index)");
+                kprintln!("   180ms systemd-journald.service");
+                kprintln!("   120ms systemd-udevd.service");
+                kprintln!("    80ms console-setup.service");
+                kprintln!("    45ms systemd-logind.service");
+                kprintln!();
+            }
+            "critical-chain" => {
+                kprintln!();
+                kinfo!("SYSTEMD", "The time when unit became active is printed after '@', startup duration after '+':");
+                kprintln!("graphical.target @4.150s");
+                kprintln!("└─snapd.service @2.910s +1.240s");
+                kprintln!("  └─apt-cache.service @2.650s +260ms");
+                kprintln!("    └─udev-pci.service @2.180s +470ms");
+                kprintln!("      └─networking.service @1.420s +760ms");
+                kprintln!("        └─basic.target @1.420s");
+                kprintln!("          └─sysinit.target @852ms");
+                kprintln!("            └─kernel-core.service @0ms +810ms");
+                kprintln!();
+            }
+            _ => kwarn!("SYSTEMD", "Usage: systemd-analyze [time | blame | critical-chain]"),
+        }
+    }
+
+    fn cmd_editor(&self, file: &str) {
+        if file.is_empty() {
+            kwarn!("EDITOR", "Usage: nano <filename> | vim <filename>");
+            return;
+        }
+        kprintln!();
+        kinfo!("EDITOR", "┌── Zenkai OS Micro-Editor v1.0 (nano/vim) ──────────────────────────┐");
+        kinfo!("EDITOR", "│ File: {:<60} │", file);
+        kinfo!("EDITOR", "└── [ Esc to exit, ':wq' or Ctrl+O to write ] ─────────────────────────┘");
+        if file == "/etc/apt/sources.list" {
+            kprintln!("1: deb http://deb.debian.org/debian bookworm main contrib non-free");
+            kprintln!("2: deb http://security.debian.org/debian-security bookworm-security main");
+            kprintln!("3: deb http://deb.zenkai-os.org/packages bookworm-backports main");
+            kprintln!("[ Read 3 lines from '{}' ]", file);
+        } else if file == "/etc/network/interfaces" {
+            kprintln!("1: auto lo");
+            kprintln!("2: iface lo inet loopback");
+            kprintln!("3: auto eth0");
+            kprintln!("4: iface eth0 inet dhcp");
+            kprintln!("5: auto wlan0");
+            kprintln!("6: iface wlan0 inet dhcp");
+            kprintln!("[ Read 6 lines from '{}' ]", file);
+        } else {
+            kprintln!("~ (New in-memory file buffer created)");
+            kprintln!("~ Press any key to return to Zenkai shell.");
+            kok!("EDITOR", "[ Wrote 0 bytes to in-memory buffer for '{}' ]", file);
+        }
+        kprintln!();
     }
 
     fn cmd_ping(&self, host: &str, services: &SystemServices) {
@@ -529,12 +826,29 @@ impl Shell {
     }
 
     fn cmd_hw(&self, hw: &HardwareInfo) {
-        kinfo!("HW", "CPU Vendor: {} | APIC: {} | SSE2: {} | AVX: {}", hw.cpu_vendor, hw.has_apic, hw.has_sse2, hw.has_avx);
-        kinfo!("HW", "Display: UEFI GOP {}x{} 32-bit Linear Framebuffer", hw.gop_width, hw.gop_height);
-        kinfo!("HW", "Probed PCI Devices ({} found):", hw.pci_devices.len());
-        for d in &hw.pci_devices {
-            kprintln!("  00:{:02x}.0  [{:04x}:{:04x}]  {:<14} {}", d.dev, d.vendor_id, d.device_id, d.vendor_name(), d.class_name());
+        kprintln!();
+        kinfo!("HW", "=== Bare-Metal Hardware Probing Telemetry ===");
+        kinfo!("HW", "CPU Vendor String: {} | APIC: {} | SSE2: {} | AVX: {}", hw.cpu_vendor, hw.has_apic, hw.has_sse2, hw.has_avx);
+        kinfo!("HW", "Display Output   : UEFI GOP {}x{} 32-bit Linear Framebuffer", hw.gop_width, hw.gop_height);
+        if let Some(gpu) = &hw.primary_gpu {
+            kinfo!("HW", "Primary GPU Card : {}", gpu);
         }
+        if let Some(nic) = &hw.lan_adapter {
+            kinfo!("HW", "Ethernet Adapter : {}", nic);
+        }
+        if let Some(wifi) = &hw.wifi_adapter {
+            kinfo!("HW", "Wireless Adapter : {}", wifi);
+        }
+        kinfo!("HW", "Derived MAC Addr : {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            hw.detected_mac[0], hw.detected_mac[1], hw.detected_mac[2],
+            hw.detected_mac[3], hw.detected_mac[4], hw.detected_mac[5]);
+        kprintln!();
+        kinfo!("HW", "Probed PCI Devices on Buses 0..4 ({} found):", hw.pci_devices.len());
+        for d in &hw.pci_devices {
+            kprintln!("  {:02x}:{:02x}.0  [{:04x}:{:04x}]  {:<16} {}",
+                d.bus, d.dev, d.vendor_id, d.device_id, d.vendor_name(), d.device_model_name());
+        }
+        kprintln!();
     }
 
     fn cmd_boottime(&self, hw: &HardwareInfo) {

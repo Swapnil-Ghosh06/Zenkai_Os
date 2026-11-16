@@ -40,13 +40,40 @@ impl PciDevice {
     pub fn vendor_name(&self) -> &'static str {
         match self.vendor_id {
             0x8086 => "Intel Corp.",
-            0x1022 => "AMD",
+            0x1022 => "AMD Inc.",
+            0x10DE => "NVIDIA Corp.",
+            0x1002 => "AMD / ATI",
             0x1234 => "QEMU / Bochs",
             0x1AF4 => "Red Hat / VirtIO",
             0x1B36 => "QEMU PCIe",
-            0x10EC => "Realtek",
-            0x14E4 => "Broadcom",
+            0x10EC => "Realtek Semi.",
+            0x14E4 => "Broadcom Corp.",
+            0x168C => "Qualcomm Atheros",
+            0x80EE => "Oracle VirtualBox",
             _ => "Generic PCI",
+        }
+    }
+
+    pub fn device_model_name(&self) -> &'static str {
+        match (self.vendor_id, self.device_id) {
+            (0x8086, 0x100E) => "Intel 82540EM Gigabit Ethernet (VirtualBox/QEMU)",
+            (0x8086, 0x1539) => "Intel I211 Gigabit Network Adapter",
+            (0x8086, 0x15D7) => "Intel Ethernet Connection I219-LM",
+            (0x8086, 0x2723) => "Intel Wi-Fi 6 AX200 160MHz",
+            (0x8086, 0x02F0) => "Intel Wi-Fi 6 AX201 160MHz CNVi",
+            (0x8086, 0x06F0) => "Intel Wi-Fi 6 AX210 160MHz",
+            (0x8086, 0x9DF0) => "Intel Wireless-AC 9560 160MHz",
+            (0x8086, 0x24FD) => "Intel Wireless-AC 8265 / 8275",
+            (0x10EC, 0x8168) => "Realtek RTL8111/8168/8411 PCIe GbE",
+            (0x10EC, 0xC821) => "Realtek RTL8821CE 802.11ac PCIe Wireless Adapter",
+            (0x10EC, 0xC822) => "Realtek RTL8822CE 802.11ac PCIe Wireless Adapter",
+            (0x1AF4, 0x1000) => "Red Hat VirtIO Network Adapter",
+            (0x168C, 0x003E) => "Qualcomm Atheros QCA6174 802.11ac Wireless",
+            (0x8086, 0x9A49) => "Intel Iris Xe Graphics (TigerLake-LP)",
+            (0x8086, 0x46A6) => "Intel Iris Xe Graphics (AlderLake-P)",
+            (0x80EE, 0xBEEF) => "VirtualBox Graphics Controller (VBoxVGA/VMSVGA)",
+            (0x1234, 0x1111) => "QEMU Standard VGA Display Adapter",
+            _ => self.class_name(),
         }
     }
 }
@@ -67,6 +94,10 @@ pub struct HardwareInfo {
     pub gop_width: usize,
     pub gop_height: usize,
     pub pci_devices: Vec<PciDevice>,
+    pub wifi_adapter: Option<String>,
+    pub lan_adapter: Option<String>,
+    pub primary_gpu: Option<String>,
+    pub detected_mac: [u8; 6],
     pub boot_start_tsc: u64,
     pub boot_stages: Vec<BootStageTiming>,
     pub debug_logging: bool,
@@ -83,6 +114,10 @@ impl HardwareInfo {
             gop_width: 1280,
             gop_height: 800,
             pci_devices: Vec::new(),
+            wifi_adapter: None,
+            lan_adapter: None,
+            primary_gpu: None,
+            detected_mac: [0x52, 0x54, 0x00, 0x12, 0x34, 0x56],
             boot_start_tsc: read_tsc(),
             boot_stages: Vec::new(),
             debug_logging: false,
@@ -106,27 +141,73 @@ impl HardwareInfo {
         self.has_sse2 = (leaf1.edx & (1 << 26)) != 0;
         self.has_avx = (leaf1.ecx & (1 << 28)) != 0;
 
-        // 2. PCI Bus 0 Enumeration (0xCF8 / 0xCFC)
+        // 2. PCI Multi-Bus Enumeration (Buses 0..4, Devices 0..32, Functions 0..8)
         self.pci_devices.clear();
-        for dev in 0..32u8 {
-            let id_reg = unsafe { pci_read_u32(0, dev, 0, 0x00) };
-            let vendor_id = (id_reg & 0xFFFF) as u16;
-            if vendor_id == 0xFFFF || vendor_id == 0x0000 {
-                continue;
-            }
-            let device_id = ((id_reg >> 16) & 0xFFFF) as u16;
-            let class_reg = unsafe { pci_read_u32(0, dev, 0, 0x08) };
-            let class_code = ((class_reg >> 24) & 0xFF) as u8;
-            let subclass = ((class_reg >> 16) & 0xFF) as u8;
+        for bus in 0..4u8 {
+            for dev in 0..32u8 {
+                let id_reg0 = unsafe { pci_read_u32(bus, dev, 0, 0x00) };
+                let vendor_id0 = (id_reg0 & 0xFFFF) as u16;
+                if vendor_id0 == 0xFFFF || vendor_id0 == 0x0000 {
+                    continue;
+                }
 
-            self.pci_devices.push(PciDevice {
-                bus: 0,
-                dev,
-                vendor_id,
-                device_id,
-                class_code,
-                subclass,
-            });
+                // Check if device is multi-function (header type at 0x0E bit 7)
+                let header_reg = unsafe { pci_read_u32(bus, dev, 0, 0x0C) };
+                let is_multi_function = ((header_reg >> 16) & 0x80) != 0;
+                let max_func = if is_multi_function { 8u8 } else { 1u8 };
+
+                for func in 0..max_func {
+                    let id_reg = unsafe { pci_read_u32(bus, dev, func, 0x00) };
+                    let vendor_id = (id_reg & 0xFFFF) as u16;
+                    if vendor_id == 0xFFFF || vendor_id == 0x0000 {
+                        continue;
+                    }
+                    let device_id = ((id_reg >> 16) & 0xFFFF) as u16;
+                    let class_reg = unsafe { pci_read_u32(bus, dev, func, 0x08) };
+                    let class_code = ((class_reg >> 24) & 0xFF) as u8;
+                    let subclass = ((class_reg >> 16) & 0xFF) as u8;
+
+                    let pci_dev = PciDevice {
+                        bus,
+                        dev,
+                        vendor_id,
+                        device_id,
+                        class_code,
+                        subclass,
+                    };
+
+                    // Check for network & GPU adapters
+                    if class_code == 0x02 && subclass == 0x80 {
+                        // WiFi Network Adapter
+                        self.wifi_adapter = Some(alloc::format!(
+                            "{} {} [{:04X}:{:04X}] on Bus {:02X}:{:02X}.{}",
+                            pci_dev.vendor_name(), pci_dev.device_model_name(),
+                            vendor_id, device_id, bus, dev, func
+                        ));
+                    } else if class_code == 0x02 && subclass == 0x00 {
+                        // Ethernet LAN Adapter
+                        self.lan_adapter = Some(alloc::format!(
+                            "{} {} [{:04X}:{:04X}] on Bus {:02X}:{:02X}.{}",
+                            pci_dev.vendor_name(), pci_dev.device_model_name(),
+                            vendor_id, device_id, bus, dev, func
+                        ));
+                        // Derive MAC address from vendor + device ID
+                        self.detected_mac[0] = ((vendor_id >> 8) & 0xFE | 0x02) as u8;
+                        self.detected_mac[1] = (vendor_id & 0xFF) as u8;
+                        self.detected_mac[2] = ((device_id >> 8) & 0xFF) as u8;
+                        self.detected_mac[3] = (device_id & 0xFF) as u8;
+                        self.detected_mac[4] = bus;
+                        self.detected_mac[5] = (dev << 3) | func;
+                    } else if class_code == 0x03 {
+                        // Display / GPU
+                        self.primary_gpu = Some(alloc::format!(
+                            "{} {}", pci_dev.vendor_name(), pci_dev.device_model_name()
+                        ));
+                    }
+
+                    self.pci_devices.push(pci_dev);
+                }
+            }
         }
     }
 
