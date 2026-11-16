@@ -5,6 +5,7 @@
 
 const COM1: u16 = 0x3F8;
 
+#[cfg(target_arch = "x86_64")]
 #[inline(always)]
 unsafe fn outb(port: u16, val: u8) {
     core::arch::asm!(
@@ -15,6 +16,7 @@ unsafe fn outb(port: u16, val: u8) {
     );
 }
 
+#[cfg(target_arch = "x86_64")]
 #[inline(always)]
 unsafe fn inb(port: u16) -> u8 {
     let val: u8;
@@ -25,6 +27,16 @@ unsafe fn inb(port: u16) -> u8 {
         options(nomem, nostack, preserves_flags)
     );
     val
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+unsafe fn outb(_port: u16, _val: u8) {}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+unsafe fn inb(_port: u16) -> u8 {
+    0x20
 }
 
 pub struct SerialPort;

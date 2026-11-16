@@ -54,31 +54,39 @@ echo "       Course : 25PCCS201 Operating Systems  |  CA-6 Flagship Project"
 echo "════════════════════════════════════════════════════════════════════════════"
 echo ""
 
-# ── [1/6] Compile Rust UEFI Kernel ────────────────────────────────────────────
-echo -e "\033[36m[1/6] Compiling Zenkai OS Rust UEFI kernel (x86_64-unknown-uefi release)...\033[0m"
-cargo build --release --target x86_64-unknown-uefi 2>&1 | grep -v "^$" | tail -6
+# ── [1/6] Compile Rust UEFI Kernel (Universal Dual-Architecture) ──────────────
+echo -e "\033[36m[1/6] Compiling Zenkai OS Rust UEFI kernels (x86_64 + aarch64 universal release)...\033[0m"
+cargo build --release --target x86_64-unknown-uefi 2>&1 | grep -v "^$" | tail -4
+cargo build --release --target aarch64-unknown-uefi 2>&1 | grep -v "^$" | tail -4
 
 EFI_BIN="$SCRIPT_DIR/target/x86_64-unknown-uefi/release/zenkai_os.efi"
+EFI_BIN_AA64="$SCRIPT_DIR/target/aarch64-unknown-uefi/release/zenkai_os.efi"
+
 if [ ! -f "$EFI_BIN" ]; then
-    echo -e "\033[31m[✗] Kernel binary not found: $EFI_BIN\033[0m"; exit 1
+    echo -e "\033[31m[✗] x86_64 Kernel binary not found: $EFI_BIN\033[0m"; exit 1
 fi
-echo -e "\033[32m[✓] Kernel binary: $EFI_BIN ($(wc -c < "$EFI_BIN" | tr -d ' ') bytes)\033[0m"
+if [ ! -f "$EFI_BIN_AA64" ]; then
+    echo -e "\033[31m[✗] aarch64 Kernel binary not found: $EFI_BIN_AA64\033[0m"; exit 1
+fi
+echo -e "\033[32m[✓] x86_64 Kernel : $EFI_BIN ($(wc -c < "$EFI_BIN" | tr -d ' ') bytes)\033[0m"
+echo -e "\033[32m[✓] aarch64 Kernel: $EFI_BIN_AA64 ($(wc -c < "$EFI_BIN_AA64" | tr -d ' ') bytes)\033[0m"
 
 # ── [2/6] Set Up ISO Staging Tree ─────────────────────────────────────────────
 echo ""
-echo -e "\033[36m[2/6] Setting up ISO staging tree...\033[0m"
+echo -e "\033[36m[2/6] Setting up Universal Dual-Architecture ISO staging tree...\033[0m"
 rm -rf "$BUILD_DIR"
 mkdir -p "$GRUB_EFI_DIR"
 mkdir -p "$ISO_STAGE/boot/grub"
 mkdir -p "$ESP_DIR/EFI/BOOT"
 
-# Copy Zenkai OS EFI binary into the ISO root (direct UEFI boot fallback)
+# Copy Zenkai OS EFI binaries into the ISO root (direct UEFI boot fallbacks)
 cp "$EFI_BIN" "$GRUB_EFI_DIR/ZENKAIOS.EFI"
-# Also copy to EFI fallback path
 cp "$EFI_BIN" "$ISO_STAGE/EFI/BOOT/BOOTX64.EFI"
+cp "$EFI_BIN_AA64" "$ISO_STAGE/EFI/BOOT/BOOTAA64.EFI"
+cp "$EFI_BIN_AA64" "$ISO_STAGE/EFI/BOOT/ZENKAIAA64.EFI"
 
-echo -e "\033[32m[✓] Staged EFI binary to EFI/BOOT/BOOTX64.EFI (native UEFI fallback)\033[0m"
-echo -e "\033[32m[✓] Staged EFI binary to EFI/BOOT/ZENKAIOS.EFI (GRUB chainload target)\033[0m"
+echo -e "\033[32m[✓] Staged x86_64  binary to EFI/BOOT/BOOTX64.EFI (PC / Intel / AMD / Pen Drive)\033[0m"
+echo -e "\033[32m[✓] Staged aarch64 binary to EFI/BOOT/BOOTAA64.EFI (Apple Silicon / Mac VirtualBox)\033[0m"
 
 # ── [3/6] Generate GRUB EFI Bootloader Image ──────────────────────────────────
 echo ""
@@ -170,9 +178,11 @@ mformat -i "$ESP_IMG" -h 1 -s 32 -t 1024 :: 2>/dev/null || mformat -i "$ESP_IMG"
 # Create directory structure on the image
 mmd -i "$ESP_IMG" "::EFI" 2>/dev/null || true
 mmd -i "$ESP_IMG" "::EFI/BOOT" 2>/dev/null || true
-# Copy GRUB EFI binary and Zenkai OS EFI binary into the image
+# Copy both x86_64 and aarch64 EFI binaries into the FAT ESP image
 mcopy -i "$ESP_IMG" "$GRUB_EFI_BIN"  "::EFI/BOOT/BOOTX64.EFI"
 mcopy -i "$ESP_IMG" "$EFI_BIN"       "::EFI/BOOT/ZENKAIOS.EFI"
+mcopy -i "$ESP_IMG" "$EFI_BIN_AA64"  "::EFI/BOOT/BOOTAA64.EFI"
+mcopy -i "$ESP_IMG" "$EFI_BIN_AA64"  "::EFI/BOOT/ZENKAIAA64.EFI"
 
 echo -e "\033[32m[✓] EFI System Partition image: $ESP_IMG (16 MB)\033[0m"
 
