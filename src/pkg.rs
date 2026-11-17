@@ -43,13 +43,13 @@ pub struct SystemServices {
     pub lan_connected: bool,
     pub lan_ip: &'static str,
     pub wifi_connected: bool,
-    pub wifi_ip: &'static str,
+    pub wifi_ip: alloc::string::String,
     pub active_ssid: alloc::string::String,
     pub custom_ssid: Option<alloc::string::String>,
     pub last_ping_ms: u32,
 }
 
-fn load_wifi_from_uefi_fs() -> Option<Vec<WifiNetwork>> {
+fn load_wifi_from_uefi_fs() -> Option<(Vec<WifiNetwork>, Option<alloc::string::String>)> {
     let path = uefi::CString16::try_from("\\EFI\\BOOT\\wifi_scan.txt").ok()?;
     let fs_proto = uefi::boot::get_image_file_system(uefi::boot::image_handle()).ok()?;
     let mut fs = uefi::fs::FileSystem::new(fs_proto);
@@ -57,12 +57,23 @@ fn load_wifi_from_uefi_fs() -> Option<Vec<WifiNetwork>> {
     parse_wifi_scan_txt(&bytes)
 }
 
-fn parse_wifi_scan_txt(bytes: &[u8]) -> Option<Vec<WifiNetwork>> {
+fn parse_wifi_scan_txt(bytes: &[u8]) -> Option<(Vec<WifiNetwork>, Option<alloc::string::String>)> {
     let text = core::str::from_utf8(bytes).ok()?;
     let mut nets = Vec::new();
+    let mut detected_ip = None;
     for line in text.lines() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with("# IP|") || line.starts_with("# IP:") {
+            let ip_part = line[5..].trim();
+            if !ip_part.is_empty() {
+                detected_ip = Some(alloc::string::String::from(ip_part));
+            }
+            continue;
+        }
+        if line.starts_with('#') {
             continue;
         }
         let parts: Vec<&str> = line.split('|').collect();
@@ -88,27 +99,34 @@ fn parse_wifi_scan_txt(bytes: &[u8]) -> Option<Vec<WifiNetwork>> {
     if nets.is_empty() {
         None
     } else {
-        Some(nets)
+        Some((nets, detected_ip))
     }
 }
 
-pub fn load_device_wifi() -> Vec<WifiNetwork> {
-    if let Some(nets) = load_wifi_from_uefi_fs() {
-        return nets;
+pub fn load_device_wifi() -> (Vec<WifiNetwork>, Option<alloc::string::String>) {
+    if let Some(res) = load_wifi_from_uefi_fs() {
+        return res;
     }
-    crate::wifi_data::default_scanned_networks()
+    (crate::wifi_data::default_scanned_networks(), Some(alloc::string::String::from(crate::wifi_data::default_wifi_ip())))
 }
 
 impl SystemServices {
     pub fn new() -> Self {
-        let mut nets = load_device_wifi();
-        let active = if let Some(first_conn) = nets.iter().find(|n| n.connected) {
-            first_conn.ssid.clone()
-        } else if let Some(first) = nets.first_mut() {
-            first.connected = true;
+        let (nets, detected_ip) = load_device_wifi();
+        let connected_net = nets.iter().find(|n| n.connected);
+        let wifi_connected = connected_net.is_some();
+        let active = if let Some(conn) = connected_net {
+            conn.ssid.clone()
+        } else if let Some(first) = nets.first() {
             first.ssid.clone()
         } else {
-            alloc::string::String::from("Zenkai-Lab-5G")
+            alloc::string::String::from("Disconnected")
+        };
+
+        let wifi_ip = if let Some(ip) = detected_ip {
+            ip
+        } else {
+            alloc::string::String::from(crate::wifi_data::default_wifi_ip())
         };
 
         Self {
@@ -136,8 +154,8 @@ impl SystemServices {
             wifi_networks: nets,
             lan_connected: true,
             lan_ip: "10.0.2.15/24",
-            wifi_connected: true,
-            wifi_ip: "192.168.1.104/24",
+            wifi_connected,
+            wifi_ip,
             active_ssid: active,
             custom_ssid: None,
             last_ping_ms: 14,
@@ -270,9 +288,12 @@ impl SystemServices {
     }
 
     pub fn refresh_wifi_scan(&mut self) {
-        let mut fresh = load_device_wifi();
+        let (mut fresh, detected_ip) = load_device_wifi();
         if fresh.is_empty() {
             fresh = crate::wifi_data::default_scanned_networks();
+        }
+        if let Some(ip) = detected_ip {
+            self.wifi_ip = ip;
         }
         let tsc = crate::timer::read_tsc();
         // Slightly vary signal percentages to reflect real-world live RF fluctuations
