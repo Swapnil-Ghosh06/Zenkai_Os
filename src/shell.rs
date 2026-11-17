@@ -113,7 +113,7 @@ impl Shell {
             "apt" | "aptitude" => self.cmd_apt(arg1, arg2, services),
             "snap" => self.cmd_snap(arg1, arg2, services),
             "wifi" | "net" | "scan" => self.cmd_net(cmd, arg1, arg2, services, hw),
-            "ping" => self.cmd_ping(arg1, services),
+            "ping" => self.cmd_ping(arg1, arg2, arg3, services),
             "hw" | "pci" => self.cmd_hw(hw),
             "lscpu" | "cpuid" => self.cmd_lscpu(hw),
             "boottime" => self.cmd_boottime(hw),
@@ -814,18 +814,85 @@ impl Shell {
         kprintln!();
     }
 
-    fn cmd_ping(&self, host: &str, services: &SystemServices) {
-        let target = if host.is_empty() { "deb.debian.org" } else { host };
+    fn cmd_ping(&self, arg1: &str, arg2: &str, arg3: &str, services: &mut SystemServices) {
+        let mut target = "8.8.8.8";
+        let mut count = 4usize;
+
+        // Support both: ping -c 4 <host> AND ping <host> -c 4 AND ping <host>
+        if arg1 == "-c" {
+            if let Ok(c) = arg2.parse::<usize>() {
+                count = c.clamp(1, 10);
+            }
+            if !arg3.is_empty() {
+                target = arg3;
+            }
+        } else if arg2 == "-c" {
+            if !arg1.is_empty() {
+                target = arg1;
+            }
+            if let Ok(c) = arg3.parse::<usize>() {
+                count = c.clamp(1, 10);
+            }
+        } else if !arg1.is_empty() {
+            target = arg1;
+        }
+
         if !services.lan_connected && !services.wifi_connected {
-            kerror!("PING", "Network unreachable: both LAN and WiFi are down.");
+            kprintln!("ping: connect: Network is unreachable");
+            kerror!("PING", "Both wlan0 (WiFi) and eth0 (LAN) interfaces are DOWN.");
             return;
         }
-        kinfo!("PING", "PING {} via {}: 56 data bytes", target, if services.wifi_connected { "wlan0" } else { "eth0" });
-        for seq in 1..=3 {
-            sleep_ms(80);
-            kprintln!("  64 bytes from {}: icmp_seq={} ttl=57 time={} ms", target, seq, services.last_ping_ms + seq);
+
+        let (ip_str, resolved_host) = match target {
+            "google.com" | "www.google.com" => ("142.250.190.46", "google.com"),
+            "deb.debian.org" | "debian.org" => ("151.101.2.132", "deb.debian.org"),
+            "github.com" | "www.github.com" => ("140.82.121.4", "github.com"),
+            "cloudflare.com" | "1.1.1.1" => ("1.1.1.1", "one.one.one.one"),
+            "8.8.8.8" | "dns.google" => ("8.8.8.8", "dns.google"),
+            "gateway" | "router" | "192.168.1.1" => ("192.168.1.1", "gateway.local"),
+            "localhost" | "127.0.0.1" => ("127.0.0.1", "localhost"),
+            other => (other, other),
+        };
+
+        let iface = if services.wifi_connected { "wlan0" } else { "eth0" };
+        kprintln!("PING {} ({}) 56(84) bytes of data on {}.", resolved_host, ip_str, iface);
+
+        let base_latency = if ip_str == "127.0.0.1" {
+            0.05
+        } else if ip_str == "192.168.1.1" || ip_str == "gateway.local" {
+            2.10
+        } else {
+            12.40
+        };
+
+        let ttl = if ip_str == "127.0.0.1" {
+            64
+        } else if ip_str.starts_with("192.168") || ip_str.starts_with("10.") {
+            64
+        } else {
+            117
+        };
+
+        for seq in 1..=count {
+            sleep_ms(60);
+            let jitter = ((seq * 37) % 19) as f32 * 0.12;
+            let rtt = base_latency + jitter;
+            kprintln!("64 bytes from {} ({}): icmp_seq={} ttl={} time={:.2} ms",
+                resolved_host, ip_str, seq, ttl, rtt);
         }
-        kok!("PING", "3 packets transmitted, 3 received, 0% packet loss.");
+
+        let avg_rtt = base_latency + 1.15;
+        let min_rtt = base_latency + 0.12;
+        let max_rtt = base_latency + 2.16;
+
+        kprintln!();
+        kprintln!("--- {} ping statistics ---", resolved_host);
+        kprintln!("{} packets transmitted, {} received, 0% packet loss, time {}ms",
+            count, count, count * 100);
+        kprintln!("rtt min/avg/max/mdev = {:.3}/{:.3}/{:.3}/0.284 ms", min_rtt, avg_rtt, max_rtt);
+        kok!("PING", "ICMP Echo Reply verified: latency {:.2} ms via {}", avg_rtt, iface);
+
+        services.last_ping_ms = avg_rtt as u32;
     }
 
     fn cmd_hw(&self, hw: &HardwareInfo) {
