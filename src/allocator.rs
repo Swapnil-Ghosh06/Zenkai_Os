@@ -5,6 +5,8 @@
 
 pub const HEAP_SIZE: usize = 64 * 1024; // 64 KB heap pool for kernel structures
 
+static mut KERNEL_HEAP_POOL: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+
 #[repr(C)]
 pub struct BlockHeader {
     pub size: usize,
@@ -13,7 +15,6 @@ pub struct BlockHeader {
 }
 
 pub struct FreeListAllocator {
-    heap: [u8; HEAP_SIZE],
     head: Option<*mut BlockHeader>,
     pub total_allocated: usize,
     pub peak_allocated: usize,
@@ -22,7 +23,6 @@ pub struct FreeListAllocator {
 impl FreeListAllocator {
     pub const fn new() -> Self {
         Self {
-            heap: [0; HEAP_SIZE],
             head: None,
             total_allocated: 0,
             peak_allocated: 0,
@@ -30,7 +30,7 @@ impl FreeListAllocator {
     }
 
     pub fn init(&mut self) {
-        let base_ptr = self.heap.as_mut_ptr() as *mut BlockHeader;
+        let base_ptr = core::ptr::addr_of_mut!(KERNEL_HEAP_POOL) as *mut BlockHeader;
         let header_size = core::mem::size_of::<BlockHeader>();
         let initial_capacity = HEAP_SIZE - header_size;
 
