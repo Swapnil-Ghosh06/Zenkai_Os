@@ -88,7 +88,7 @@ impl Shell {
 
         match cmd {
             "help" => self.cmd_help(),
-            "info" | "uname" => self.cmd_info(hw),
+            "uname" => self.cmd_info(hw),
             "whoami" => self.cmd_whoami(),
             "uptime" => self.cmd_uptime(),
             "r19" | "ca2" => self.cmd_r19(),
@@ -125,14 +125,15 @@ impl Shell {
                 if services.is_apt_installed("neofetch") {
                     self.cmd_neofetch(services, hw);
                 } else {
-                    kwarn!("SHELL", "Command 'neofetch' not found. Install via: apt install neofetch");
+                    kwarn!("SHELL", "Command 'neofetch' not found. Install via: apt install neofetch (or type 'info')");
                 }
             }
+            "info" | "banner" => self.cmd_neofetch(services, hw),
             "htop" => {
                 if services.is_apt_installed("htop") {
-                    self.cmd_ps();
+                    self.cmd_htop();
                 } else {
-                    kwarn!("SHELL", "Command 'htop' not found. Install via: apt install htop");
+                    kwarn!("SHELL", "Command 'htop' not found. Install via: apt install htop (or type 'ps')");
                 }
             }
             "tensor-bench" => {
@@ -877,15 +878,40 @@ impl Shell {
         kprintln!();
     }
 
+    fn cmd_htop(&self) {
+        kprintln!();
+        kprintln!("  \x1b[1;36m1\x1b[0m  [\x1b[1;32m|||||||||||||||||||||             \x1b[0m 24.8%]   Tasks: 4 total, 1 running, 3 sleeping");
+        kprintln!("  \x1b[1;36m2\x1b[0m  [\x1b[1;32m|||||||||||                       \x1b[0m 12.4%]   Load average: 0.14 0.08 0.05");
+        kprintln!("  \x1b[1;33mMem\x1b[0m[\x1b[1;34m||||||||||||||||||||       \x1b[0m64MB/2048MB]   Uptime: 00:04:15 | CPU: 2 Cores");
+        kprintln!("  \x1b[1;35mSwp\x1b[0m[                                 0KB/0KB]   Scheduler: Round-Robin (Q=4 ticks)");
+        kprintln!();
+        kprintln!("  \x1b[7m  PID USER      PRI  NI  VIRT   RES   SHR S  CPU%  MEM%   TIME+  COMMAND            \x1b[0m");
+        kprintln!("      1 root       20   0  128K   64K   32K R  18.4   3.1  0:01.42 /sbin/kernel_core");
+        kprintln!("      2 swapnil    20   0  512K  128K   64K S   4.2   6.2  0:00.76 /usr/bin/r19_ai_worker");
+        kprintln!("      3 swapnil    20   0  256K   96K   48K S   1.8   4.7  0:00.28 /usr/sbin/wpa_supplicant");
+        kprintln!("      4 snapd      20   0 1024K  256K  128K S   0.4  12.5  0:00.14 /usr/lib/snapd/snapd");
+        kprintln!();
+        kprintln!("  \x1b[2m[ Tip: Type 'ps' for task states, 'nice <pid> <prio>' to adjust quantum ]\x1b[0m");
+        kprintln!();
+    }
+
     fn cmd_neofetch(&self, services: &SystemServices, hw: &HardwareInfo) {
         kprintln!();
-        kinfo!("NEOFETCH", "swapnil@zenkai-os");
-        kprintln!("  OS      : Zenkai OS 0.9.2 x86_64 (UEFI)");
-        kprintln!("  Author  : Swapnil Ghosh (25BTRCL267 AIML-E)");
-        kprintln!("  CPU     : {} (APIC={}, AVX={})", hw.cpu_vendor, hw.has_apic, hw.has_avx);
-        kprintln!("  Display : {}x{} UEFI GOP", hw.gop_width, hw.gop_height);
-        kprintln!("  Network : WiFi ({}) + LAN ({})", services.active_ssid, services.lan_ip);
-        kprintln!("  Packages: {} (aptitude), {} (snap)", services.apt_installed_count(), services.snap_installed_count());
+        kprintln!("         \x1b[36m_______\x1b[0m         \x1b[1;32mswapnil\x1b[0m@\x1b[1;36mzenkai-os\x1b[0m");
+        kprintln!("        \x1b[36m/ _____ \\\x1b[0m        -----------------");
+        kprintln!("       \x1b[36m/ /     \\ \\\x1b[0m       \x1b[1;33mOS\x1b[0m: Zenkai OS 0.9.2 (no_std Rust micro-kernel)");
+        kprintln!("      \x1b[36m| |   \x1b[1;37m禅\x1b[0m  \x1b[36m| |\x1b[0m      \x1b[1;33mHost\x1b[0m: Bare-Metal UEFI / Oracle VirtualBox");
+        kprintln!("       \x1b[36m\\ \\_____/ /\x1b[0m       \x1b[1;33mKernel\x1b[0m: 0.9.2-zen-ai (x86_64 / aarch64)");
+        kprintln!("        \x1b[36m\\_______/\x1b[0m        \x1b[1;33mAuthor\x1b[0m: Swapnil Ghosh (25BTRCL267, AIML-E)");
+        kprintln!("       \x1b[36m/    |    \\\x1b[0m       \x1b[1;33mDisplay\x1b[0m: {}x{} UEFI GOP Framebuffer", hw.gop_width, hw.gop_height);
+        kprintln!("      \x1b[36m/     |     \\\x1b[0m      \x1b[1;33mDesktop\x1b[0m: Zenkai DE (Glass Dark macOS Theme)");
+        kprintln!("     \x1b[36m/______|______\\\x1b[0m     \x1b[1;33mCPU\x1b[0m: {} (APIC={}, AVX={})", hw.cpu_vendor, hw.has_apic, hw.has_avx);
+        kprintln!("                         \x1b[1;33mMemory\x1b[0m: 64 MB / 2048 MB (Physical Frames + Heap)");
+        kprintln!("                         \x1b[1;33mNetwork\x1b[0m: wlan0 ({}, 802.11ax) + eth0 (GigE)", services.active_ssid);
+        kprintln!("                         \x1b[1;33mPackages\x1b[0m: {} (aptitude), {} (snapstore)", services.apt_installed_count(), services.snap_installed_count());
+        kprintln!("                         \x1b[1;33mResearch\x1b[0m: R19 AI/ML Page Replacement [Active]");
+        kprintln!();
+        kprintln!("       \x1b[40m   \x1b[41m   \x1b[42m   \x1b[43m   \x1b[44m   \x1b[45m   \x1b[46m   \x1b[47m   \x1b[0m");
         kprintln!();
     }
 

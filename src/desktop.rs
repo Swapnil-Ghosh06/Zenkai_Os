@@ -193,6 +193,10 @@ impl Desktop {
                         }
                     }
                     Key::Printable(c) if char::from(c) == '\t' => {
+                        if self.active_tab == DesktopTab::Terminal && !self.cmd_line.is_empty() {
+                            self.autocomplete_cmd();
+                            continue;
+                        }
                         let next = DesktopTab::from_index((self.active_tab as usize) + 1);
                         self.switch_tab(next);
                         continue;
@@ -501,6 +505,64 @@ impl Desktop {
         self.needs_full_redraw = true;
     }
 
+    fn autocomplete_cmd(&mut self) {
+        if self.cmd_line.is_empty() {
+            return;
+        }
+        const CMDS: &[&str] = &[
+            "apt install ",
+            "apt list",
+            "apt remove ",
+            "aptitude",
+            "bench",
+            "boottime",
+            "ca",
+            "ca2",
+            "ca3",
+            "ca5",
+            "clear",
+            "cpuid",
+            "dpkg -l",
+            "dpkg -s ",
+            "free",
+            "help",
+            "htop",
+            "hw",
+            "ifconfig",
+            "lscpu",
+            "neofetch",
+            "ping 8.8.8.8",
+            "ps",
+            "r19",
+            "reboot",
+            "scan",
+            "snap install ",
+            "snap list",
+            "sync",
+            "systemd-analyze blame",
+            "systemd-analyze time",
+            "tensor-bench",
+            "uptime",
+            "vim ",
+            "whoami",
+            "wifi connect ",
+            "wifi scan",
+        ];
+
+        let trimmed = self.cmd_line.trim_start();
+        for &cmd in CMDS {
+            if cmd.starts_with(trimmed) && cmd != trimmed {
+                for _ in 0..self.cmd_line.len() {
+                    crate::kprint!("\x08 \x08");
+                }
+                self.cmd_line.clear();
+                self.cmd_line.push_str(cmd);
+                crate::kprint!("{}", cmd);
+                return;
+            }
+        }
+    }
+
     fn handle_terminal_key(&mut self, key: Key, shell: &mut Shell, services: &mut SystemServices, hw: &HardwareInfo) {
         match key {
             Key::Special(ScanCode::LEFT) => {
@@ -521,6 +583,8 @@ impl Desktop {
                     "r19",
                     "boottime",
                     "hw",
+                    "neofetch",
+                    "htop",
                     "ca",
                 ];
                 let chosen = suggestions[self.cmd_history_idx % suggestions.len()];
@@ -533,10 +597,32 @@ impl Desktop {
                 crate::kprint!("{}", chosen);
             }
             Key::Special(ScanCode::DOWN) => {
-                for _ in 0..self.cmd_line.len() {
-                    crate::kprint!("\x08 \x08");
+                let suggestions = [
+                    "wifi scan",
+                    "apt list",
+                    "snap list",
+                    "r19",
+                    "boottime",
+                    "hw",
+                    "neofetch",
+                    "htop",
+                    "ca",
+                ];
+                if self.cmd_history_idx > 0 {
+                    self.cmd_history_idx -= 1;
+                    let chosen = suggestions[self.cmd_history_idx % suggestions.len()];
+                    for _ in 0..self.cmd_line.len() {
+                        crate::kprint!("\x08 \x08");
+                    }
+                    self.cmd_line.clear();
+                    self.cmd_line.push_str(chosen);
+                    crate::kprint!("{}", chosen);
+                } else {
+                    for _ in 0..self.cmd_line.len() {
+                        crate::kprint!("\x08 \x08");
+                    }
+                    self.cmd_line.clear();
                 }
-                self.cmd_line.clear();
             }
             Key::Printable(c16) => {
                 let ch = char::from(c16);
@@ -706,6 +792,15 @@ impl Desktop {
             let app_lbl = format!("|   {}   -   Swapnil Ghosh (25BTRCL267)", self.active_tab.title());
             fb.draw_aa_text(82, 5, &UI_SANS, &app_lbl, Color::TEXT_MUTED, None);
 
+            // Network indicators in Top Bar
+            let wifi_badge = if services.wifi_connected { "● WiFi: 802.11ax" } else { "○ WiFi: Off" };
+            let wifi_col = if services.wifi_connected { Color::SAGE } else { Color::TEXT_MUTED };
+            fb.draw_aa_text(w.saturating_sub(430), 5, &UI_SANS, wifi_badge, wifi_col, None);
+
+            let lan_badge = if services.lan_connected { "● LAN: 1 Gbps" } else { "○ LAN: Off" };
+            let lan_col = if services.lan_connected { Color::ACCENT } else { Color::TEXT_MUTED };
+            fb.draw_aa_text(w.saturating_sub(310), 5, &UI_SANS, lan_badge, lan_col, None);
+
             // Control Center Pill in Top Bar
             let (ccbx, ccby, ccbw, ccbh) = Self::cc_button_bounds(w);
             let cc_fill = if self.control_center_open { Color::ACCENT } else { Color::SURFACE_CARD };
@@ -765,6 +860,10 @@ impl Desktop {
                 let lw = UI_SANS.text_width(lbl);
                 let col = if is_active { Color::TEXT_PRIMARY } else { Color::TEXT_MUTED };
                 fb.draw_aa_text(ix + (item_w.saturating_sub(lw)) / 2, dy + 10, &UI_SANS, lbl, col, None);
+
+                if is_active {
+                    fb.draw_rounded_rect(ix + (item_w / 2) - 4, dy + dh - 5, 8, 2, 1, Color::ACCENT, None);
+                }
             }
 
             // 5. Control Center Popover (drawn on top of window if open!)
