@@ -112,7 +112,7 @@ impl Shell {
             "step" => self.cmd_step(arg1),
             "apt" | "aptitude" => self.cmd_apt(arg1, arg2, services),
             "snap" => self.cmd_snap(arg1, arg2, services),
-            "wifi" | "net" => self.cmd_net(cmd, arg1, arg2, services, hw),
+            "wifi" | "net" | "scan" => self.cmd_net(cmd, arg1, arg2, services, hw),
             "ping" => self.cmd_ping(arg1, services),
             "hw" | "pci" => self.cmd_hw(hw),
             "lscpu" | "cpuid" => self.cmd_lscpu(hw),
@@ -563,17 +563,19 @@ impl Shell {
     }
 
     fn cmd_net(&self, cmd: &str, sub: &str, arg: &str, services: &mut SystemServices, hw: &HardwareInfo) {
-        if cmd == "wifi" && sub == "scan" {
+        if (cmd == "wifi" && sub == "scan") || cmd == "scan" || (cmd == "net" && sub == "scan") {
+            services.refresh_wifi_scan();
             kinfo!("WIFI", "Scanning 802.11 channels (Ch 1..14 @ 2.4GHz, Ch 36..165 @ 5.0GHz)...");
             sleep_ms(160);
             kinfo!("WIFI", "Detected {} BSSID beacons on interface wlan0:", services.wifi_networks.len());
             kprintln!("  {:<24} {:<18} {:<4} {:<9} {:<8} {:<16}", "SSID", "BSSID", "CH", "FREQ", "SIGNAL", "SECURITY");
             kprintln!("  -------------------------------------------------------------------------------------");
             let bssids = [
-                ("74:83:C2:4B:91:20", "36", "5.18 GHz", "-42 dBm"),
-                ("00:25:9C:12:34:56", "6",  "2.43 GHz", "-58 dBm"),
-                ("9E:F2:71:08:14:BC", "1",  "2.41 GHz", "-62 dBm"),
-                ("E4:8D:8C:77:21:44", "149", "5.74 GHz", "-74 dBm"),
+                ("74:83:C2:4B:91:20", "36", "5.18 GHz", "-41 dBm"),
+                ("00:25:9C:12:34:56", "6",  "2.43 GHz", "-56 dBm"),
+                ("9E:F2:71:08:14:BC", "1",  "2.41 GHz", "-52 dBm"),
+                ("E4:8D:8C:77:21:44", "149", "5.74 GHz", "-72 dBm"),
+                ("CC:46:D6:88:19:01", "44",  "5.22 GHz", "-64 dBm"),
             ];
             for (i, w) in services.wifi_networks.iter().enumerate() {
                 let mark = if w.connected && services.wifi_connected { "*" } else { " " };
@@ -581,7 +583,7 @@ impl Shell {
                 kprintln!("  [{}] {} {:<21} {:<18} {:<4} {:<9} {:<8} {:<16}",
                     i, mark, w.ssid, bssid, ch, freq, dbm, w.security);
             }
-            kprintln!("  (Tip: Type 'wifi connect <0..3>' or 'wifi connect <SSID_NAME>' to associate).");
+            kprintln!("  (Tip: Type 'wifi connect <0..{}>' or 'wifi connect <SSID_NAME>' to associate).", services.wifi_networks.len().saturating_sub(1));
             return;
         }
 

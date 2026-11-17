@@ -209,6 +209,24 @@ impl SystemServices {
         self.active_ssid = self.wifi_networks[idx].ssid;
     }
 
+    pub fn refresh_wifi_scan(&mut self) {
+        if self.wifi_networks.len() == 4 {
+            self.wifi_networks.push(WifiNetwork {
+                ssid: "Zenkai-Faculty-5G",
+                signal_pct: 74,
+                security: "WPA3-Enterprise",
+                band: "5 GHz",
+                connected: false,
+            });
+        }
+        let signals = [96, 84, 88, 56, 75];
+        for (i, net) in self.wifi_networks.iter_mut().enumerate() {
+            if i < signals.len() {
+                net.signal_pct = signals[i];
+            }
+        }
+    }
+
     pub fn toggle_lan(&mut self) {
         self.lan_connected = !self.lan_connected;
     }

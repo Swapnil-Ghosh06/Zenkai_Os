@@ -65,6 +65,7 @@ pub struct Desktop {
     pub r19_last_summary: String,
     pub status_msg: String,
     pub cmd_line: String,
+    pub cmd_history_idx: usize,
     pub needs_full_redraw: bool,
     pub start_tsc: u64,
     pub last_sec: u64,
@@ -80,8 +81,9 @@ impl Desktop {
             control_center_open: false,
             window_maximized: false,
             r19_last_summary: String::from("Click 'Run R19 Benchmark' to compare FIFO vs LRU vs OPT live."),
-            status_msg: String::from("Click any control or use Tab / F1-F4 / F5 (Control Center)"),
+            status_msg: String::from("Navigate tabs: ← / → or Tab | Select: ↑ / ↓ | Run: Enter | Scan Wi-Fi: S"),
             cmd_line: String::new(),
+            cmd_history_idx: 0,
             needs_full_redraw: true,
             start_tsc: read_tsc(),
             last_sec: 0,
@@ -371,10 +373,15 @@ impl Desktop {
                     self.needs_full_redraw = true;
                     return;
                 }
+                // Scan Nearby Wi-Fi button
+                if mouse.in_rect(wx + ww - 232, wy + 144, 204, 32) {
+                    self.scan_nearby_wifi(services);
+                    return;
+                }
                 // WiFi network rows
                 for idx in 0..services.wifi_networks.len() {
-                    let ry = wy + 168 + idx * 52;
-                    if mouse.in_rect(wx + 28, ry, ww - 56, 44) {
+                    let ry = wy + 186 + idx * 48;
+                    if mouse.in_rect(wx + 28, ry, ww - 56, 42) {
                         self.wifi_cursor = idx;
                         self.connect_selected_wifi(services);
                         return;
@@ -443,6 +450,35 @@ impl Desktop {
         self.needs_full_redraw = true;
     }
 
+    fn scan_nearby_wifi(&mut self, services: &mut SystemServices) {
+        let mut con = GLOBAL_CONSOLE.lock();
+        if let Some(fb) = &mut con.fb {
+            let (wx, wy, ww, wh) = self.window_bounds(fb.width, fb.height);
+            let bar_x = wx + 28;
+            let bar_y = wy + wh - 44;
+            let bar_w = ww - 56;
+
+            fb.fill_rect(bar_x, bar_y - 24, bar_w, 38, Color::SURFACE);
+            let msg = "Scanning 802.11 channels (Ch 1..14 @ 2.4GHz, Ch 36..165 @ 5.0GHz)...";
+            fb.draw_aa_text(bar_x, bar_y - 24, &UI_SANS, msg, Color::ACCENT, None);
+            fb.draw_rounded_rect(bar_x, bar_y, bar_w, 8, 4, Color::SURFACE_ALT, None);
+
+            for step in 1..=8 {
+                let fill_w = (bar_w * step) / 8;
+                fb.draw_rounded_rect(bar_x, bar_y, fill_w, 8, 4, Color::SAGE, None);
+                sleep_ms(25);
+            }
+        }
+        drop(con);
+
+        services.refresh_wifi_scan();
+        self.status_msg = format!(
+            "Scan complete: {} nearby Wi-Fi APs detected. Press Enter to connect.",
+            services.wifi_networks.len()
+        );
+        self.needs_full_redraw = true;
+    }
+
     fn run_live_r19(&mut self, hw: &HardwareInfo) {
         let mut seq = [0u8; REF_LENGTH];
         let mut strided = [0u8; REF_LENGTH];
@@ -467,6 +503,41 @@ impl Desktop {
 
     fn handle_terminal_key(&mut self, key: Key, shell: &mut Shell, services: &mut SystemServices, hw: &HardwareInfo) {
         match key {
+            Key::Special(ScanCode::LEFT) => {
+                if self.cmd_line.is_empty() {
+                    self.switch_tab(DesktopTab::System);
+                }
+            }
+            Key::Special(ScanCode::RIGHT) => {
+                if self.cmd_line.is_empty() {
+                    self.switch_tab(DesktopTab::Packages);
+                }
+            }
+            Key::Special(ScanCode::UP) => {
+                let suggestions = [
+                    "wifi scan",
+                    "apt list",
+                    "snap list",
+                    "r19",
+                    "boottime",
+                    "hw",
+                    "ca",
+                ];
+                let chosen = suggestions[self.cmd_history_idx % suggestions.len()];
+                self.cmd_history_idx = self.cmd_history_idx.wrapping_add(1);
+                for _ in 0..self.cmd_line.len() {
+                    crate::kprint!("\x08 \x08");
+                }
+                self.cmd_line.clear();
+                self.cmd_line.push_str(chosen);
+                crate::kprint!("{}", chosen);
+            }
+            Key::Special(ScanCode::DOWN) => {
+                for _ in 0..self.cmd_line.len() {
+                    crate::kprint!("\x08 \x08");
+                }
+                self.cmd_line.clear();
+            }
             Key::Printable(c16) => {
                 let ch = char::from(c16);
                 if ch == '\r' || ch == '\n' {
@@ -478,7 +549,7 @@ impl Desktop {
                 } else if ch == '\x08' || ch == '\x7f' {
                     if !self.cmd_line.is_empty() {
                         self.cmd_line.pop();
-                        crate::kprint!("\x08");
+                        crate::kprint!("\x08 \x08");
                     }
                 } else if ch.is_ascii() && !ch.is_control() {
                     self.cmd_line.push(ch);
@@ -509,7 +580,25 @@ impl Desktop {
                     self.needs_full_redraw = true;
                 }
             }
-            Key::Printable(c) if char::from(c) == 's' || char::from(c) == 'S' => {
+            Key::Special(ScanCode::LEFT) => {
+                if self.pkg_mode_snap {
+                    self.pkg_mode_snap = false;
+                    self.pkg_cursor = 0;
+                    self.needs_full_redraw = true;
+                } else {
+                    self.switch_tab(DesktopTab::Terminal);
+                }
+            }
+            Key::Special(ScanCode::RIGHT) => {
+                if !self.pkg_mode_snap {
+                    self.pkg_mode_snap = true;
+                    self.pkg_cursor = 0;
+                    self.needs_full_redraw = true;
+                } else {
+                    self.switch_tab(DesktopTab::Network);
+                }
+            }
+            Key::Printable(c) if char::from(c) == 's' || char::from(c) == 'S' || char::from(c) == 'a' || char::from(c) == 'A' => {
                 self.pkg_mode_snap = !self.pkg_mode_snap;
                 self.pkg_cursor = 0;
                 self.needs_full_redraw = true;
@@ -555,7 +644,16 @@ impl Desktop {
                     self.needs_full_redraw = true;
                 }
             }
-            Key::Printable(c) if char::from(c) == '\r' || char::from(c) == '\n' => {
+            Key::Special(ScanCode::LEFT) => {
+                self.switch_tab(DesktopTab::Packages);
+            }
+            Key::Special(ScanCode::RIGHT) => {
+                self.switch_tab(DesktopTab::System);
+            }
+            Key::Printable(c) if char::from(c) == 's' || char::from(c) == 'S' => {
+                self.scan_nearby_wifi(services);
+            }
+            Key::Printable(c) if char::from(c) == '\r' || char::from(c) == '\n' || char::from(c) == ' ' => {
                 self.connect_selected_wifi(services);
             }
             _ => {}
@@ -563,10 +661,20 @@ impl Desktop {
     }
 
     fn handle_system_key(&mut self, key: Key, hw: &HardwareInfo) {
-        if let Key::Printable(c) = key {
-            if char::from(c) == 'r' || char::from(c) == 'R' || char::from(c) == '\r' {
-                self.run_live_r19(hw);
+        match key {
+            Key::Special(ScanCode::LEFT) => {
+                self.switch_tab(DesktopTab::Network);
             }
+            Key::Special(ScanCode::RIGHT) => {
+                self.switch_tab(DesktopTab::Terminal);
+            }
+            Key::Printable(c) => {
+                let ch = char::from(c);
+                if ch == 'r' || ch == 'R' || ch == '\r' || ch == '\n' || ch == ' ' {
+                    self.run_live_r19(hw);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -783,22 +891,32 @@ impl Desktop {
         fb.draw_aa_text(lan_x + 16, wy + 104, &UI_SANS, &l_sub, Color::TEXT_MUTED, None);
         fb.draw_toggle_switch(lan_x + card_w - 56, wy + 74, services.lan_connected, Color::ACCENT);
 
+        // Header & Scan Nearby Wi-Fi button
+        fb.draw_aa_text(wx + 28, wy + 152, &UI_HEADING, "Nearby Wi-Fi Networks (802.11ax / 5GHz & 2.4GHz)", Color::TEXT_PRIMARY, None);
+
+        let btn_scan_x = wx + ww - 232;
+        let btn_scan_y = wy + 144;
+        fb.draw_rounded_rect(btn_scan_x, btn_scan_y, 204, 32, 8, Color::SURFACE_HOVER, Some(Color::ACCENT));
+        let scan_txt = "🔍 Scan Nearby Wi-Fi (S)";
+        let stw = UI_SANS.text_width(scan_txt);
+        fb.draw_aa_text(btn_scan_x + (204 - stw) / 2, btn_scan_y + 6, &UI_SANS, scan_txt, Color::ACCENT, None);
+
         for (idx, net) in services.wifi_networks.iter().enumerate() {
-            let ry = wy + 168 + idx * 52;
+            let ry = wy + 186 + idx * 48;
             let selected = idx == self.wifi_cursor;
             let bg = if selected { Color::SURFACE_HOVER } else { Color::SURFACE_CARD };
-            let brd = if net.connected { Color::SAGE } else { Color::BORDER };
-            fb.draw_rounded_rect(wx + 28, ry, ww - 56, 44, 10, bg, Some(brd));
+            let brd = if net.connected { Color::SAGE } else if selected { Color::VIOLET } else { Color::BORDER };
+            fb.draw_rounded_rect(wx + 28, ry, ww - 56, 42, 10, bg, Some(brd));
 
-            fb.draw_aa_text(wx + 44, ry + 10, &UI_SANS, net.ssid, Color::TEXT_PRIMARY, None);
+            fb.draw_aa_text(wx + 44, ry + 9, &UI_SANS, net.ssid, Color::TEXT_PRIMARY, None);
             let meta = format!("{}  |  {}  |  Signal {}%", net.band, net.security, net.signal_pct);
-            fb.draw_aa_text(wx + 300, ry + 10, &UI_SANS, &meta, Color::TEXT_MUTED, None);
+            fb.draw_aa_text(wx + 300, ry + 9, &UI_SANS, &meta, Color::TEXT_MUTED, None);
 
             let badge = if net.connected { "Connected" } else { "Connect" };
             let bcol = if net.connected { Color::SAGE } else { Color::ACCENT };
-            fb.draw_rounded_rect(wx + ww - 160, ry + 7, 118, 30, 8, Color::SURFACE, Some(bcol));
+            fb.draw_rounded_rect(wx + ww - 160, ry + 6, 118, 30, 8, Color::SURFACE, Some(bcol));
             let bw = UI_SANS.text_width(badge);
-            fb.draw_aa_text(wx + ww - 160 + (118 - bw) / 2, ry + 10, &UI_SANS, badge, bcol, None);
+            fb.draw_aa_text(wx + ww - 160 + (118 - bw) / 2, ry + 9, &UI_SANS, badge, bcol, None);
         }
 
         fb.draw_aa_text(wx + 28, wy + wh - 34, &UI_SANS, &self.status_msg, Color::SAGE, None);
