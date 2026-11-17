@@ -85,6 +85,12 @@ cp "$EFI_BIN" "$ISO_STAGE/EFI/BOOT/BOOTX64.EFI"
 cp "$EFI_BIN_AA64" "$ISO_STAGE/EFI/BOOT/BOOTAA64.EFI"
 cp "$EFI_BIN_AA64" "$ISO_STAGE/EFI/BOOT/ZENKAIAA64.EFI"
 
+if [ -f "$SCRIPT_DIR/wifi_scan.txt" ]; then
+    cp "$SCRIPT_DIR/wifi_scan.txt" "$GRUB_EFI_DIR/wifi_scan.txt"
+    cp "$SCRIPT_DIR/wifi_scan.txt" "$ISO_STAGE/EFI/BOOT/wifi_scan.txt"
+    cp "$SCRIPT_DIR/wifi_scan.txt" "$ESP_DIR/EFI/BOOT/wifi_scan.txt"
+fi
+
 echo -e "\033[32m[✓] Staged x86_64  binary to EFI/BOOT/BOOTX64.EFI (PC / Intel / AMD / Pen Drive)\033[0m"
 echo -e "\033[32m[✓] Staged aarch64 binary to EFI/BOOT/BOOTAA64.EFI (Apple Silicon / Mac VirtualBox)\033[0m"
 

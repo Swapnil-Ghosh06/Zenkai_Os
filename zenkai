@@ -32,10 +32,16 @@ else
 fi
 
 build_kernel() {
+    echo -e "\x1b[36m[*] Scanning live nearby Wi-Fi networks using host device adapter...\x1b[0m"
+    python3 "$PROJECT_DIR/tools/scan_wifi.py" || true
     echo -e "\x1b[36m[*] Compiling Zenkai OS release binary (x86_64-unknown-uefi)...\x1b[0m"
     cargo build --release --target x86_64-unknown-uefi
     mkdir -p "$ESP_DIR/EFI/BOOT"
     cp "target/x86_64-unknown-uefi/release/zenkai_os.efi" "$ESP_DIR/EFI/BOOT/BOOTX64.EFI"
+    if [ -f "$PROJECT_DIR/wifi_scan.txt" ]; then
+        cp "$PROJECT_DIR/wifi_scan.txt" "$ESP_DIR/EFI/BOOT/wifi_scan.txt"
+        cp "$PROJECT_DIR/wifi_scan.txt" "$ESP_DIR/wifi_scan.txt"
+    fi
     echo -e "\x1b[32m[+] Zenkai OS binary ready: target/x86_64-unknown-uefi/release/zenkai_os.efi\x1b[0m"
 }
 

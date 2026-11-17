@@ -32,6 +32,10 @@ def build_kernel():
 def setup_esp():
     os.makedirs(os.path.join(ESP_DIR, "EFI", "BOOT"), exist_ok=True)
     shutil.copyfile(EFI_BINARY, os.path.join(ESP_DIR, "EFI", "BOOT", "BOOTX64.EFI"))
+    wifi_txt = os.path.join(PROJECT_DIR, "wifi_scan.txt")
+    if os.path.exists(wifi_txt):
+        shutil.copyfile(wifi_txt, os.path.join(ESP_DIR, "EFI", "BOOT", "wifi_scan.txt"))
+        shutil.copyfile(wifi_txt, os.path.join(ESP_DIR, "wifi_scan.txt"))
 
 def run_qemu_test():
     qemu_bin = "qemu-system-x86_64"

@@ -16,6 +16,9 @@ cd "$PROJECT_DIR"
 OVMF_PATH="ovmf/OVMF.fd"
 BUILD_MODE="${1:-gui}"
 
+echo -e "\x1b[36m[*] Scanning live nearby Wi-Fi networks using host device adapter...\x1b[0m"
+python3 "$PROJECT_DIR/tools/scan_wifi.py" || true
+
 echo -e "\x1b[36m[*] Building Zenkai OS (x86_64-unknown-uefi)...\x1b[0m"
 cargo build --release
 
@@ -29,6 +32,10 @@ ESP_DIR="/tmp/zenkai-esp"
 rm -rf "$ESP_DIR"
 mkdir -p "$ESP_DIR/EFI/BOOT"
 cp "$EFI_BINARY" "$ESP_DIR/EFI/BOOT/BOOTX64.EFI"
+if [ -f "$PROJECT_DIR/wifi_scan.txt" ]; then
+    cp "$PROJECT_DIR/wifi_scan.txt" "$ESP_DIR/EFI/BOOT/wifi_scan.txt"
+    cp "$PROJECT_DIR/wifi_scan.txt" "$ESP_DIR/wifi_scan.txt"
+fi
 
 echo -e "\x1b[32m[+] UEFI System Partition populated: $ESP_DIR/EFI/BOOT/BOOTX64.EFI\x1b[0m"
 

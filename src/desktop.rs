@@ -81,7 +81,7 @@ impl Desktop {
             control_center_open: false,
             window_maximized: true,
             r19_last_summary: String::from("Click 'Run R19 Benchmark' to compare FIFO vs LRU vs OPT live."),
-            status_msg: String::from("Navigate tabs: ← / → or Tab | Select: ↑ / ↓ | Run: Enter | Scan Wi-Fi: S"),
+            status_msg: String::from("Navigate: [Tab] or [<- / ->]  |  Select: [Up / Down]  |  Run: [Enter]  |  Scan Wi-Fi: [S]"),
             cmd_line: String::new(),
             cmd_history_idx: 0,
             needs_full_redraw: true,
@@ -92,32 +92,32 @@ impl Desktop {
 
     fn window_bounds(&self, w: usize, h: usize) -> (usize, usize, usize, usize) {
         if self.window_maximized {
-            let win_w = w.saturating_sub(16);
-            let win_h = h.saturating_sub(86);
-            (8, 38, win_w, win_h)
+            let win_w = w.saturating_sub(24);
+            let win_h = h.saturating_sub(96);
+            (12, 38, win_w, win_h)
         } else {
-            let win_w = 1100.min(w.saturating_sub(64));
-            let win_h = 610.min(h.saturating_sub(124));
+            let win_w = 1060.min(w.saturating_sub(48));
+            let win_h = 520.min(h.saturating_sub(136));
             let win_x = (w.saturating_sub(win_w)) / 2;
-            let win_y = 44 + (h.saturating_sub(114).saturating_sub(win_h)) / 2;
+            let win_y = 42 + (h.saturating_sub(126).saturating_sub(win_h)) / 3;
             (win_x, win_y, win_w, win_h)
         }
     }
 
     fn dock_bounds(w: usize, h: usize) -> (usize, usize, usize, usize) {
-        let dock_w = 460usize;
-        let dock_h = 44usize;
+        let dock_w = 440usize;
+        let dock_h = 42usize;
         let dock_x = (w.saturating_sub(dock_w)) / 2;
-        let dock_y = h.saturating_sub(dock_h + 12);
+        let dock_y = h.saturating_sub(dock_h + 10);
         (dock_x, dock_y, dock_w, dock_h)
     }
 
     fn cc_button_bounds(w: usize) -> (usize, usize, usize, usize) {
-        (w.saturating_sub(278), 5, 174, 24)
+        (w.saturating_sub(236), 5, 132, 24)
     }
 
     fn cc_popover_bounds(w: usize) -> (usize, usize, usize, usize) {
-        (w.saturating_sub(332), 40, 316, 286)
+        (w.saturating_sub(300), 38, 286, 276)
     }
 
     pub fn run(&mut self, shell: &mut Shell, services: &mut SystemServices, hw: &mut HardwareInfo) {
@@ -341,30 +341,39 @@ impl Desktop {
         }
 
         // 5. Tab-Specific Clicks
-        let _ = (shell, wh);
+        let _ = shell;
         match self.active_tab {
             DesktopTab::Packages => {
                 // Segmented buttons
-                if mouse.in_rect(wx + 28, wy + 58, 170, 32) {
+                if mouse.in_rect(wx + 28, wy + 52, 160, 32) {
                     self.pkg_mode_snap = false;
                     self.pkg_cursor = 0;
                     self.needs_full_redraw = true;
                     return;
                 }
-                if mouse.in_rect(wx + 206, wy + 58, 170, 32) {
+                if mouse.in_rect(wx + 196, wy + 52, 160, 32) {
                     self.pkg_mode_snap = true;
                     self.pkg_cursor = 0;
                     self.needs_full_redraw = true;
                     return;
                 }
-                // Package rows
-                let count = if self.pkg_mode_snap { services.snap_apps.len() } else { services.apt_packages.len().min(9) };
-                for idx in 0..count {
-                    let ry = wy + 106 + idx * 44;
-                    if mouse.in_rect(wx + 28, ry, ww - 56, 38) {
+                // Package rows with scroll offset
+                let list_y = wy + 94;
+                let avail_h = (wy + wh - 44).saturating_sub(list_y);
+                let row_h = 42;
+                let total_count = if self.pkg_mode_snap { services.snap_apps.len() } else { services.apt_packages.len() };
+                let visible_count = (avail_h / row_h).max(1).min(total_count);
+                let scroll_top = if self.pkg_cursor >= visible_count {
+                    self.pkg_cursor + 1 - visible_count
+                } else {
+                    0
+                };
+                for v_idx in 0..visible_count {
+                    let idx = scroll_top + v_idx;
+                    let ry = list_y + v_idx * row_h;
+                    if mouse.in_rect(wx + 28, ry, ww - 56, 36) {
                         self.pkg_cursor = idx;
-                        // Click on right-side pill button or double-action directly installs/toggles!
-                        if mouse.in_rect(wx + ww - 160, ry + 4, 124, 30) {
+                        if mouse.in_rect(wx + ww - 146, ry + 3, 106, 28) {
                             self.toggle_selected_package(services);
                         } else {
                             self.needs_full_redraw = true;
@@ -375,33 +384,47 @@ impl Desktop {
             }
             DesktopTab::Network => {
                 // WiFi / LAN card toggles
-                let card_w = (ww - 72) / 2;
-                if mouse.in_rect(wx + 28, wy + 62, card_w, 78) {
+                let card_w = (ww - 68) / 2;
+                if mouse.in_rect(wx + 28, wy + 50, card_w, 68) {
                     services.wifi_connected = !services.wifi_connected;
                     self.status_msg = format!("WiFi {}", if services.wifi_connected { "Connected" } else { "Disconnected" });
                     self.needs_full_redraw = true;
                     return;
                 }
-                if mouse.in_rect(wx + 44 + card_w, wy + 62, card_w, 78) {
+                if mouse.in_rect(wx + 28 + card_w + 12, wy + 50, card_w, 68) {
                     services.lan_connected = !services.lan_connected;
                     self.status_msg = format!("Ethernet LAN {}", if services.lan_connected { "Connected" } else { "Disconnected" });
                     self.needs_full_redraw = true;
                     return;
                 }
-                // Scan Nearby Wi-Fi button
-                if mouse.in_rect(wx + ww - 380, wy + 144, 180, 32) {
+                // Action buttons: Scan & Ping
+                let btn_ping_w = 124;
+                let btn_ping_x = wx + ww - 28 - btn_ping_w;
+                let btn_scan_w = 144;
+                let btn_scan_x = btn_ping_x - 10 - btn_scan_w;
+                if mouse.in_rect(btn_scan_x, wy + 126, btn_scan_w, 30) {
                     self.scan_nearby_wifi(services);
                     return;
                 }
-                // Test Ping button
-                if mouse.in_rect(wx + ww - 190, wy + 144, 162, 32) {
+                if mouse.in_rect(btn_ping_x, wy + 126, btn_ping_w, 30) {
                     self.run_ping_test(services);
                     return;
                 }
-                // WiFi network rows
-                for idx in 0..services.wifi_networks.len() {
-                    let ry = wy + 186 + idx * 48;
-                    if mouse.in_rect(wx + 28, ry, ww - 56, 42) {
+                // WiFi network rows with scroll offset
+                let list_y = wy + 166;
+                let avail_h = (wy + wh - 44).saturating_sub(list_y);
+                let row_h = 42;
+                let total_count = services.wifi_networks.len();
+                let visible_count = (avail_h / row_h).max(1).min(total_count);
+                let scroll_top = if self.wifi_cursor >= visible_count {
+                    self.wifi_cursor + 1 - visible_count
+                } else {
+                    0
+                };
+                for v_idx in 0..visible_count {
+                    let idx = scroll_top + v_idx;
+                    let ry = list_y + v_idx * row_h;
+                    if mouse.in_rect(wx + 28, ry, ww - 56, 36) {
                         self.wifi_cursor = idx;
                         self.connect_selected_wifi(services);
                         return;
@@ -409,8 +432,7 @@ impl Desktop {
                 }
             }
             DesktopTab::System => {
-                // Run R19 Live Benchmark button
-                if mouse.in_rect(wx + ww - 236, wy + 58, 208, 34) {
+                if mouse.in_rect(wx + ww - 216, wy + 48, 188, 32) {
                     self.run_live_r19(hw);
                     return;
                 }
@@ -466,7 +488,7 @@ impl Desktop {
         }
         drop(con);
         services.connect_wifi_idx(self.wifi_cursor);
-        self.status_msg = format!("Connected to '{}' via wpa_supplicant ({})", services.active_ssid, services.wifi_ip);
+        self.status_msg = format!("Connected to '{}' via wpa_supplicant ({})", services.get_active_ssid(), services.wifi_ip);
         self.needs_full_redraw = true;
     }
 
@@ -833,14 +855,65 @@ impl Desktop {
     }
 
     fn draw_top_bar_clock(fb: &mut Framebuffer, elapsed_secs: u64) {
-        let mins = (elapsed_secs / 60) % 60;
-        let secs = elapsed_secs % 60;
-        let hrs = elapsed_secs / 3600;
-        let time_str = format!("{:02}:{:02}:{:02}", hrs, mins, secs);
+        let time_str = format!(
+            "{:02}:{:02}:{:02}",
+            (elapsed_secs / 3600) % 24,
+            (elapsed_secs / 60) % 60,
+            elapsed_secs % 60
+        );
         let tw = UI_SANS.text_width(&time_str);
-        let tx = fb.width.saturating_sub(tw + 20);
-        fb.fill_rect(tx - 12, 4, tw + 24, 26, Color::SURFACE_ALT);
-        fb.draw_aa_text(tx, 5, &UI_SANS, &time_str, Color::TEXT_PRIMARY, None);
+        let clock_w = tw + 20;
+        let clock_x = fb.width.saturating_sub(clock_w + 12);
+        fb.draw_rounded_rect(clock_x, 5, clock_w, 24, 6, Color::SURFACE_CARD, Some(Color::BORDER));
+        fb.draw_aa_text(clock_x + 10, 5, &UI_SANS, &time_str, Color::TEXT_PRIMARY, None);
+    }
+
+    fn draw_top_bar(&self, fb: &mut Framebuffer, w: usize, services: &SystemServices, elapsed_secs: u64) {
+        // Frosted Top Menu Bar background (34px)
+        fb.fill_rect(0, 0, w, 34, Color::SURFACE_ALT);
+        fb.fill_rect(0, 34, w, 1, Color::BORDER);
+
+        // Right-to-left dynamic layout calculation (NEVER overlaps!)
+        // 1. Digital Clock
+        Self::draw_top_bar_clock(fb, elapsed_secs);
+
+        // 2. Control Center button
+        let (ccbx, ccby, ccbw, ccbh) = Self::cc_button_bounds(w);
+        let cc_fill = if self.control_center_open { Color::ACCENT } else { Color::SURFACE_CARD };
+        let cc_txt = if self.control_center_open { Color::SHADOW } else { Color::TEXT_PRIMARY };
+        fb.draw_rounded_rect(ccbx, ccby, ccbw, ccbh, 7, cc_fill, Some(Color::BORDER));
+        let wifi_dot = if services.wifi_connected { Color::SAGE } else { Color::CORAL };
+        fb.draw_rounded_rect(ccbx + 8, ccby + 8, 8, 8, 4, wifi_dot, None);
+        fb.draw_aa_text(ccbx + 22, ccby, &UI_SANS, "Control Center", cc_txt, None);
+
+        // 3. LAN Status Pill
+        let lan_w = 64;
+        let lan_x = ccbx.saturating_sub(lan_w + 8);
+        fb.draw_rounded_rect(lan_x, 5, lan_w, 24, 6, Color::SURFACE_CARD, Some(Color::BORDER));
+        let lan_dot = if services.lan_connected { Color::ACCENT } else { Color::TEXT_MUTED };
+        fb.draw_rounded_rect(lan_x + 8, 13, 8, 8, 4, lan_dot, None);
+        fb.draw_aa_text(lan_x + 22, 5, &UI_SANS, "LAN", Color::TEXT_PRIMARY, None);
+
+        // 4. Wi-Fi Status Pill
+        let wifi_w = 76;
+        let wifi_x = lan_x.saturating_sub(wifi_w + 8);
+        fb.draw_rounded_rect(wifi_x, 5, wifi_w, 24, 6, Color::SURFACE_CARD, Some(Color::BORDER));
+        let wifi_dot = if services.wifi_connected { Color::SAGE } else { Color::CORAL };
+        fb.draw_rounded_rect(wifi_x + 8, 13, 8, 8, 4, wifi_dot, None);
+        let wifi_lbl = if services.wifi_connected { "Wi-Fi" } else { "Off" };
+        fb.draw_aa_text(wifi_x + 22, 5, &UI_SANS, wifi_lbl, Color::TEXT_PRIMARY, None);
+
+        // 5. Left Side: Brand, Tab Title & Author (Clipped safely before wifi_x)
+        let left_max = wifi_x.saturating_sub(16);
+        fb.draw_aa_text(18, 5, &UI_SANS, "Zenkai", Color::TEXT_PRIMARY, None);
+        fb.draw_aa_text(74, 5, &UI_SANS, "|", Color::BORDER, None);
+        fb.draw_aa_text(88, 5, &UI_SANS, self.active_tab.title(), Color::TEXT_PRIMARY, None);
+
+        let tab_end = 88 + UI_SANS.text_width(self.active_tab.title());
+        if w >= 940 && tab_end + 220 < left_max {
+            let author_txt = "-  Swapnil Ghosh (25BTRCL267)";
+            fb.draw_aa_text(tab_end + 14, 5, &UI_SANS, author_txt, Color::TEXT_MUTED, None);
+        }
     }
 
     fn render_screen(&self, services: &SystemServices, hw: &HardwareInfo, elapsed_secs: u64, mouse: &mut MouseDriver) {
@@ -853,32 +926,8 @@ impl Desktop {
             // 1. Atmospheric macOS Glass-Dark Wallpaper Gradient
             fb.fill_gradient(Color::BG_TOP, Color::BG_BOTTOM);
 
-            // 2. Frosted Top Menu Bar (34px)
-            fb.fill_rect(0, 0, w, 34, Color::SURFACE_ALT);
-            fb.fill_rect(0, 34, w, 1, Color::BORDER);
-            fb.draw_aa_text(18, 5, &UI_SANS, "Zenkai", Color::TEXT_PRIMARY, None);
-            let app_lbl = format!("|   {}   -   Swapnil Ghosh (25BTRCL267)", self.active_tab.title());
-            fb.draw_aa_text(82, 5, &UI_SANS, &app_lbl, Color::TEXT_MUTED, None);
-
-            // Network indicators in Top Bar
-            let wifi_badge = if services.wifi_connected { "● WiFi: 802.11ax" } else { "○ WiFi: Off" };
-            let wifi_col = if services.wifi_connected { Color::SAGE } else { Color::TEXT_MUTED };
-            fb.draw_aa_text(w.saturating_sub(430), 5, &UI_SANS, wifi_badge, wifi_col, None);
-
-            let lan_badge = if services.lan_connected { "● LAN: 1 Gbps" } else { "○ LAN: Off" };
-            let lan_col = if services.lan_connected { Color::ACCENT } else { Color::TEXT_MUTED };
-            fb.draw_aa_text(w.saturating_sub(310), 5, &UI_SANS, lan_badge, lan_col, None);
-
-            // Control Center Pill in Top Bar
-            let (ccbx, ccby, ccbw, ccbh) = Self::cc_button_bounds(w);
-            let cc_fill = if self.control_center_open { Color::ACCENT } else { Color::SURFACE_CARD };
-            let cc_txt = if self.control_center_open { Color::SHADOW } else { Color::TEXT_PRIMARY };
-            fb.draw_rounded_rect(ccbx, ccby, ccbw, ccbh, 8, cc_fill, Some(Color::BORDER));
-            let wifi_dot = if services.wifi_connected { Color::SAGE } else { Color::CORAL };
-            fb.draw_rounded_rect(ccbx + 10, ccby + 8, 8, 8, 4, wifi_dot, None);
-            fb.draw_aa_text(ccbx + 24, ccby, &UI_SANS, "Control Center", cc_txt, None);
-
-            Self::draw_top_bar_clock(fb, elapsed_secs);
+            // 2. Frosted Top Menu Bar (34px) with dynamic, un-congested layout
+            self.draw_top_bar(fb, w, services, elapsed_secs);
 
             // 3. Main Glass Window
             let (wx, wy, ww, wh) = self.window_bounds(w, h);
@@ -968,24 +1017,24 @@ impl Desktop {
             fb.draw_toggle_switch(px + pw - 68, ry + 8, state, col);
         }
 
-        let btn_y = py + 232;
-        fb.draw_rounded_rect(px + 14, btn_y, 138, 36, 10, Color::SURFACE_HOVER, Some(Color::BORDER));
-        fb.draw_aa_text(px + 52, btn_y + 6, &UI_SANS, "Restart", Color::TEXT_PRIMARY, None);
+        let btn_y = py + 228;
+        fb.draw_rounded_rect(px + 14, btn_y, 126, 34, 8, Color::SURFACE_HOVER, Some(Color::BORDER));
+        fb.draw_aa_text(px + 46, btn_y + 5, &UI_SANS, "Restart", Color::TEXT_PRIMARY, None);
 
-        fb.draw_rounded_rect(px + 164, btn_y, 138, 36, 10, Color::SURFACE_HOVER, Some(Color::CORAL));
-        fb.draw_aa_text(px + 195, btn_y + 6, &UI_SANS, "Power Off", Color::CORAL, None);
+        fb.draw_rounded_rect(px + 146, btn_y, 126, 34, 8, Color::SURFACE_HOVER, Some(Color::CORAL));
+        fb.draw_aa_text(px + 172, btn_y + 5, &UI_SANS, "Power Off", Color::CORAL, None);
     }
 
     fn draw_packages_tab(&self, fb: &mut Framebuffer, wx: usize, wy: usize, ww: usize, wh: usize, services: &SystemServices) {
         let apt_bg = if !self.pkg_mode_snap { Color::ACCENT } else { Color::SURFACE_ALT };
         let apt_fg = if !self.pkg_mode_snap { Color::SHADOW } else { Color::TEXT_MUTED };
-        fb.draw_rounded_rect(wx + 28, wy + 56, 170, 34, 9, apt_bg, Some(Color::BORDER));
-        fb.draw_aa_text(wx + 50, wy + 61, &UI_SANS, "Aptitude (APT)", apt_fg, None);
+        fb.draw_rounded_rect(wx + 28, wy + 52, 160, 32, 8, apt_bg, Some(Color::BORDER));
+        fb.draw_aa_text(wx + 44, wy + 56, &UI_SANS, "Aptitude (APT)", apt_fg, None);
 
         let snap_bg = if self.pkg_mode_snap { Color::VIOLET } else { Color::SURFACE_ALT };
         let snap_fg = if self.pkg_mode_snap { Color::SHADOW } else { Color::TEXT_MUTED };
-        fb.draw_rounded_rect(wx + 206, wy + 56, 170, 34, 9, snap_bg, Some(Color::BORDER));
-        fb.draw_aa_text(wx + 248, wy + 61, &UI_SANS, "Snapstore", snap_fg, None);
+        fb.draw_rounded_rect(wx + 196, wy + 52, 160, 32, 8, snap_bg, Some(Color::BORDER));
+        fb.draw_aa_text(wx + 236, wy + 56, &UI_SANS, "Snapstore", snap_fg, None);
 
         let stats = format!(
             "Installed: {} apt  |  {} snap",
@@ -993,114 +1042,148 @@ impl Desktop {
             services.snap_installed_count()
         );
         let sw = UI_SANS.text_width(&stats);
-        fb.draw_aa_text(wx + ww - sw - 28, wy + 61, &UI_SANS, &stats, Color::TEXT_MUTED, None);
+        fb.draw_aa_text(wx + ww - sw - 28, wy + 56, &UI_SANS, &stats, Color::TEXT_MUTED, None);
 
-        let list_y = wy + 106;
+        let list_y = wy + 94;
+        let avail_h = (wy + wh - 44).saturating_sub(list_y);
+        let row_h = 42;
+        let total_count = if self.pkg_mode_snap { services.snap_apps.len() } else { services.apt_packages.len() };
+        let visible_count = (avail_h / row_h).max(1).min(total_count);
+        let scroll_top = if self.pkg_cursor >= visible_count {
+            self.pkg_cursor + 1 - visible_count
+        } else {
+            0
+        };
+
         if !self.pkg_mode_snap {
-            for (idx, pkg) in services.apt_packages.iter().take(9).enumerate() {
-                let ry = list_y + idx * 44;
+            for (v_idx, pkg) in services.apt_packages.iter().skip(scroll_top).take(visible_count).enumerate() {
+                let idx = scroll_top + v_idx;
+                let ry = list_y + v_idx * row_h;
                 let selected = idx == self.pkg_cursor;
                 let row_bg = if selected { Color::SURFACE_HOVER } else { Color::SURFACE_CARD };
                 let border = if selected { Color::ACCENT } else { Color::BORDER };
-                fb.draw_rounded_rect(wx + 28, ry, ww - 56, 38, 10, row_bg, Some(border));
+                fb.draw_rounded_rect(wx + 28, ry, ww - 56, 36, 9, row_bg, Some(border));
 
-                fb.draw_aa_text(wx + 44, ry + 7, &UI_SANS, pkg.name, Color::TEXT_PRIMARY, None);
-                fb.draw_aa_text(wx + 220, ry + 7, &UI_SANS, pkg.description, Color::TEXT_MUTED, None);
+                fb.draw_aa_text(wx + 44, ry + 6, &UI_SANS, pkg.name, Color::TEXT_PRIMARY, None);
+                fb.draw_aa_text(wx + 200, ry + 6, &UI_SANS, pkg.description, Color::TEXT_MUTED, None);
 
                 let btn_col = if pkg.installed { Color::SAGE } else { Color::ACCENT };
                 let btn_txt = if pkg.installed { "Installed" } else { "Install" };
-                fb.draw_rounded_rect(wx + ww - 160, ry + 4, 118, 30, 8, Color::SURFACE, Some(btn_col));
+                fb.draw_rounded_rect(wx + ww - 146, ry + 3, 106, 28, 7, Color::SURFACE, Some(btn_col));
                 let btw = UI_SANS.text_width(btn_txt);
-                fb.draw_aa_text(wx + ww - 160 + (118 - btw) / 2, ry + 7, &UI_SANS, btn_txt, btn_col, None);
+                fb.draw_aa_text(wx + ww - 146 + (106 - btw) / 2, ry + 6, &UI_SANS, btn_txt, btn_col, None);
             }
         } else {
-            for (idx, app) in services.snap_apps.iter().enumerate() {
-                let ry = list_y + idx * 44;
+            for (v_idx, app) in services.snap_apps.iter().skip(scroll_top).take(visible_count).enumerate() {
+                let idx = scroll_top + v_idx;
+                let ry = list_y + v_idx * row_h;
                 let selected = idx == self.pkg_cursor;
                 let row_bg = if selected { Color::SURFACE_HOVER } else { Color::SURFACE_CARD };
                 let border = if selected { Color::VIOLET } else { Color::BORDER };
-                fb.draw_rounded_rect(wx + 28, ry, ww - 56, 38, 10, row_bg, Some(border));
+                fb.draw_rounded_rect(wx + 28, ry, ww - 56, 36, 9, row_bg, Some(border));
 
-                fb.draw_aa_text(wx + 44, ry + 7, &UI_SANS, app.name, Color::TEXT_PRIMARY, None);
-                fb.draw_aa_text(wx + 220, ry + 7, &UI_SANS, app.description, Color::TEXT_MUTED, None);
+                fb.draw_aa_text(wx + 44, ry + 6, &UI_SANS, app.name, Color::TEXT_PRIMARY, None);
+                fb.draw_aa_text(wx + 200, ry + 6, &UI_SANS, app.description, Color::TEXT_MUTED, None);
 
                 let btn_col = if app.installed { Color::SAGE } else { Color::VIOLET };
                 let btn_txt = if app.installed { "Installed" } else { "Install" };
-                fb.draw_rounded_rect(wx + ww - 160, ry + 4, 118, 30, 8, Color::SURFACE, Some(btn_col));
+                fb.draw_rounded_rect(wx + ww - 146, ry + 3, 106, 28, 7, Color::SURFACE, Some(btn_col));
                 let btw = UI_SANS.text_width(btn_txt);
-                fb.draw_aa_text(wx + ww - 160 + (118 - btw) / 2, ry + 7, &UI_SANS, btn_txt, btn_col, None);
+                fb.draw_aa_text(wx + ww - 146 + (106 - btw) / 2, ry + 6, &UI_SANS, btn_txt, btn_col, None);
             }
         }
 
-        fb.draw_aa_text(wx + 28, wy + wh - 34, &UI_SANS, &self.status_msg, Color::ACCENT, None);
+        // Dedicated Window Footer separator & status message
+        fb.fill_rect(wx + 20, wy + wh - 36, ww - 40, 1, Color::BORDER);
+        fb.draw_aa_text(wx + 28, wy + wh - 26, &UI_SANS, &self.status_msg, Color::ACCENT, None);
     }
 
     fn draw_network_tab(&self, fb: &mut Framebuffer, wx: usize, wy: usize, ww: usize, wh: usize, services: &SystemServices) {
-        let card_w = (ww - 72) / 2;
-        fb.draw_glass_panel(wx + 28, wy + 62, card_w, 78, 12, Color::SURFACE_CARD, Color::BORDER);
-        fb.draw_aa_text(wx + 44, wy + 72, &UI_HEADING, "WiFi (wlan0)", Color::TEXT_PRIMARY, None);
+        let card_w = (ww - 68) / 2;
+        fb.draw_glass_panel(wx + 28, wy + 50, card_w, 68, 10, Color::SURFACE_CARD, Color::BORDER);
+        fb.draw_aa_text(wx + 40, wy + 58, &UI_HEADING, "WiFi (wlan0)", Color::TEXT_PRIMARY, None);
         let w_sub = if services.wifi_connected {
-            format!("{}  |  {}", services.active_ssid, services.wifi_ip)
+            format!("{}  |  {}", services.get_active_ssid(), services.wifi_ip)
         } else {
-            String::from("Disconnected (Click to enable)")
+            String::from("Disconnected (Click card to enable)")
         };
-        fb.draw_aa_text(wx + 44, wy + 104, &UI_SANS, &w_sub, Color::TEXT_MUTED, None);
-        fb.draw_toggle_switch(wx + 28 + card_w - 56, wy + 74, services.wifi_connected, Color::SAGE);
+        fb.draw_aa_text(wx + 40, wy + 88, &UI_SANS, &w_sub, Color::TEXT_MUTED, None);
+        fb.draw_toggle_switch(wx + 28 + card_w - 56, wy + 62, services.wifi_connected, Color::SAGE);
 
-        let lan_x = wx + 44 + card_w;
-        fb.draw_glass_panel(lan_x, wy + 62, card_w, 78, 12, Color::SURFACE_CARD, Color::BORDER);
-        fb.draw_aa_text(lan_x + 16, wy + 72, &UI_HEADING, "Ethernet LAN (eth0)", Color::TEXT_PRIMARY, None);
+        let lan_x = wx + 28 + card_w + 12;
+        fb.draw_glass_panel(lan_x, wy + 50, card_w, 68, 10, Color::SURFACE_CARD, Color::BORDER);
+        fb.draw_aa_text(lan_x + 16, wy + 58, &UI_HEADING, "Ethernet LAN (eth0)", Color::TEXT_PRIMARY, None);
         let l_sub = if services.lan_connected {
             format!("Link Up 1 Gbps  |  {}", services.lan_ip)
         } else {
-            String::from("Disabled (Click to enable)")
+            String::from("Disabled (Click card to enable)")
         };
-        fb.draw_aa_text(lan_x + 16, wy + 104, &UI_SANS, &l_sub, Color::TEXT_MUTED, None);
-        fb.draw_toggle_switch(lan_x + card_w - 56, wy + 74, services.lan_connected, Color::ACCENT);
+        fb.draw_aa_text(lan_x + 16, wy + 88, &UI_SANS, &l_sub, Color::TEXT_MUTED, None);
+        fb.draw_toggle_switch(lan_x + card_w - 56, wy + 62, services.lan_connected, Color::ACCENT);
 
-        // Header & Action buttons
-        fb.draw_aa_text(wx + 28, wy + 152, &UI_HEADING, "Nearby Wi-Fi Networks (802.11ax / 5GHz & 2.4GHz)", Color::TEXT_PRIMARY, None);
+        // Header & Action buttons (never overlapping!)
+        fb.draw_aa_text(wx + 28, wy + 130, &UI_HEADING, "Nearby Wi-Fi Networks", Color::TEXT_PRIMARY, None);
 
-        let btn_scan_x = wx + ww - 380;
-        let btn_scan_y = wy + 144;
-        fb.draw_rounded_rect(btn_scan_x, btn_scan_y, 180, 32, 8, Color::SURFACE_HOVER, Some(Color::ACCENT));
-        let scan_txt = "🔍 Scan Wi-Fi (S)";
-        let stw = UI_SANS.text_width(scan_txt);
-        fb.draw_aa_text(btn_scan_x + (180 - stw) / 2, btn_scan_y + 6, &UI_SANS, scan_txt, Color::ACCENT, None);
-
-        let btn_ping_x = wx + ww - 190;
-        let btn_ping_y = wy + 144;
-        fb.draw_rounded_rect(btn_ping_x, btn_ping_y, 162, 32, 8, Color::SURFACE_HOVER, Some(Color::SAGE));
-        let ping_txt = "⚡ Test Ping (P)";
+        let btn_ping_w = 124;
+        let btn_ping_x = wx + ww - 28 - btn_ping_w;
+        let btn_ping_y = wy + 126;
+        fb.draw_rounded_rect(btn_ping_x, btn_ping_y, btn_ping_w, 30, 8, Color::SURFACE_HOVER, Some(Color::SAGE));
+        let ping_txt = "Test Ping (P)";
         let ptw = UI_SANS.text_width(ping_txt);
-        fb.draw_aa_text(btn_ping_x + (162 - ptw) / 2, btn_ping_y + 6, &UI_SANS, ping_txt, Color::SAGE, None);
+        fb.draw_aa_text(btn_ping_x + (btn_ping_w - ptw) / 2, btn_ping_y + 5, &UI_SANS, ping_txt, Color::SAGE, None);
 
-        for (idx, net) in services.wifi_networks.iter().enumerate() {
-            let ry = wy + 186 + idx * 48;
+        let btn_scan_w = 144;
+        let btn_scan_x = btn_ping_x - 10 - btn_scan_w;
+        let btn_scan_y = wy + 126;
+        fb.draw_rounded_rect(btn_scan_x, btn_scan_y, btn_scan_w, 30, 8, Color::SURFACE_HOVER, Some(Color::ACCENT));
+        let scan_txt = "Scan Wi-Fi (S)";
+        let stw = UI_SANS.text_width(scan_txt);
+        fb.draw_aa_text(btn_scan_x + (btn_scan_w - stw) / 2, btn_scan_y + 5, &UI_SANS, scan_txt, Color::ACCENT, None);
+
+        let list_y = wy + 166;
+        let avail_h = (wy + wh - 44).saturating_sub(list_y);
+        let row_h = 42;
+        let total_count = services.wifi_networks.len();
+        let visible_count = (avail_h / row_h).max(1).min(total_count);
+        let scroll_top = if self.wifi_cursor >= visible_count {
+            self.wifi_cursor + 1 - visible_count
+        } else {
+            0
+        };
+
+        for (v_idx, net) in services.wifi_networks.iter().skip(scroll_top).take(visible_count).enumerate() {
+            let idx = scroll_top + v_idx;
+            let ry = list_y + v_idx * row_h;
             let selected = idx == self.wifi_cursor;
             let bg = if selected { Color::SURFACE_HOVER } else { Color::SURFACE_CARD };
             let brd = if net.connected { Color::SAGE } else if selected { Color::VIOLET } else { Color::BORDER };
-            fb.draw_rounded_rect(wx + 28, ry, ww - 56, 42, 10, bg, Some(brd));
+            fb.draw_rounded_rect(wx + 28, ry, ww - 56, 36, 9, bg, Some(brd));
 
-            fb.draw_aa_text(wx + 44, ry + 9, &UI_SANS, net.ssid, Color::TEXT_PRIMARY, None);
+            let dot_col = if net.connected { Color::SAGE } else { Color::ACCENT };
+            fb.draw_rounded_rect(wx + 40, ry + 14, 8, 8, 4, dot_col, None);
+
+            fb.draw_aa_text(wx + 56, ry + 6, &UI_SANS, &net.ssid, Color::TEXT_PRIMARY, None);
             let meta = format!("{}  |  {}  |  Signal {}%", net.band, net.security, net.signal_pct);
-            fb.draw_aa_text(wx + 300, ry + 9, &UI_SANS, &meta, Color::TEXT_MUTED, None);
+            let meta_x = (wx + 280).max(wx + 56 + UI_SANS.text_width(&net.ssid) + 16);
+            fb.draw_aa_text(meta_x, ry + 6, &UI_SANS, &meta, Color::TEXT_MUTED, None);
 
             let badge = if net.connected { "Connected" } else { "Connect" };
             let bcol = if net.connected { Color::SAGE } else { Color::ACCENT };
-            fb.draw_rounded_rect(wx + ww - 160, ry + 6, 118, 30, 8, Color::SURFACE, Some(bcol));
+            fb.draw_rounded_rect(wx + ww - 146, ry + 3, 106, 28, 7, Color::SURFACE, Some(bcol));
             let bw = UI_SANS.text_width(badge);
-            fb.draw_aa_text(wx + ww - 160 + (118 - bw) / 2, ry + 9, &UI_SANS, badge, bcol, None);
+            fb.draw_aa_text(wx + ww - 146 + (106 - bw) / 2, ry + 6, &UI_SANS, badge, bcol, None);
         }
 
-        fb.draw_aa_text(wx + 28, wy + wh - 34, &UI_SANS, &self.status_msg, Color::SAGE, None);
+        // Dedicated Window Footer separator & status message
+        fb.fill_rect(wx + 20, wy + wh - 36, ww - 40, 1, Color::BORDER);
+        fb.draw_aa_text(wx + 28, wy + wh - 26, &UI_SANS, &self.status_msg, Color::SAGE, None);
     }
 
     fn draw_system_tab(&self, fb: &mut Framebuffer, wx: usize, wy: usize, ww: usize, wh: usize, hw: &HardwareInfo) {
-        fb.draw_aa_text(wx + 28, wy + 56, &UI_HEADING, "Hardware Compatibility & Boot Progression", Color::TEXT_PRIMARY, None);
+        fb.draw_aa_text(wx + 28, wy + 52, &UI_HEADING, "Hardware Compatibility & Boot Progression", Color::TEXT_PRIMARY, None);
 
-        fb.draw_rounded_rect(wx + ww - 236, wy + 52, 208, 34, 9, Color::VIOLET, Some(Color::BORDER));
-        fb.draw_aa_text(wx + ww - 216, wy + 57, &UI_SANS, "Run R19 Benchmark", Color::SHADOW, None);
+        fb.draw_rounded_rect(wx + ww - 216, wy + 48, 188, 32, 8, Color::VIOLET, Some(Color::BORDER));
+        fb.draw_aa_text(wx + ww - 200, wy + 53, &UI_SANS, "Run R19 Benchmark", Color::SHADOW, None);
 
         let hw_line = format!(
             "CPU: {}  |  Display: {}x{}  |  PCI Devices: {}  |  AVX: {}  |  APIC: {}",
@@ -1111,7 +1194,7 @@ impl Desktop {
             hw.has_avx,
             hw.has_apic
         );
-        fb.draw_aa_text(wx + 28, wy + 92, &TERM_MONO, &hw_line, Color::ACCENT, None);
+        fb.draw_aa_text(wx + 28, wy + 86, &TERM_MONO, &hw_line, Color::ACCENT, None);
 
         // 5-Stage Faculty Boot-Time Progression Cards
         let stages_data = [
@@ -1123,19 +1206,23 @@ impl Desktop {
         ];
 
         for (idx, &(title, total_t, delta_t, col)) in stages_data.iter().enumerate() {
-            let ry = wy + 124 + idx * 42;
-            fb.draw_rounded_rect(wx + 28, ry, ww - 56, 36, 9, Color::SURFACE_CARD, Some(Color::BORDER));
-            fb.draw_aa_text(wx + 44, ry + 6, &UI_SANS, title, Color::TEXT_PRIMARY, None);
+            let ry = wy + 116 + idx * 38;
+            fb.draw_rounded_rect(wx + 28, ry, ww - 56, 32, 8, Color::SURFACE_CARD, Some(Color::BORDER));
+            fb.draw_aa_text(wx + 44, ry + 5, &UI_SANS, title, Color::TEXT_PRIMARY, None);
 
             let time_badge = format!("Total: {}", total_t);
-            fb.draw_aa_text(wx + ww - 310, ry + 6, &TERM_MONO, &time_badge, Color::TEXT_PRIMARY, None);
+            fb.draw_aa_text(wx + ww - 290, ry + 5, &TERM_MONO, &time_badge, Color::TEXT_PRIMARY, None);
 
             let delta_badge = format!("[{}]", delta_t);
-            fb.draw_aa_text(wx + ww - 180, ry + 6, &TERM_MONO, &delta_badge, col, None);
+            fb.draw_aa_text(wx + ww - 160, ry + 5, &TERM_MONO, &delta_badge, col, None);
         }
 
         // Bottom status & R19 Benchmark Summary Panel
-        fb.draw_glass_panel(wx + 28, wy + wh - 74, ww - 56, 46, 10, Color::SURFACE_CARD, Color::VIOLET);
-        fb.draw_aa_text(wx + 42, wy + wh - 62, &TERM_MONO, &self.r19_last_summary, Color::TEXT_PRIMARY, None);
+        fb.draw_glass_panel(wx + 28, wy + wh - 80, ww - 56, 38, 8, Color::SURFACE_CARD, Color::VIOLET);
+        fb.draw_aa_text(wx + 42, wy + wh - 70, &TERM_MONO, &self.r19_last_summary, Color::TEXT_PRIMARY, None);
+
+        // Dedicated Window Footer separator & status message
+        fb.fill_rect(wx + 20, wy + wh - 36, ww - 40, 1, Color::BORDER);
+        fb.draw_aa_text(wx + 28, wy + wh - 26, &UI_SANS, &self.status_msg, Color::SAGE, None);
     }
 }

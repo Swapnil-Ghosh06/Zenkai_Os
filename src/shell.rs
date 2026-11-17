@@ -597,7 +597,7 @@ impl Shell {
             let target_ssid: alloc::string::String = if let Ok(idx) = arg.parse::<usize>() {
                 if idx < services.wifi_networks.len() {
                     services.connect_wifi_idx(idx);
-                    alloc::string::String::from(services.wifi_networks[idx].ssid)
+                    services.wifi_networks[idx].ssid.clone()
                 } else {
                     kwarn!("WIFI", "Invalid index. Available range: 0..{}", services.wifi_networks.len() - 1);
                     return;

@@ -28,6 +28,7 @@ pub mod shell;
 pub mod sync;
 pub mod task;
 pub mod timer;
+pub mod wifi_data;
 
 use uefi::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;

@@ -29,10 +29,10 @@ pub struct SnapApp {
 
 #[derive(Clone, Debug)]
 pub struct WifiNetwork {
-    pub ssid: &'static str,
+    pub ssid: alloc::string::String,
     pub signal_pct: u8,
-    pub security: &'static str,
-    pub band: &'static str,
+    pub security: alloc::string::String,
+    pub band: alloc::string::String,
     pub connected: bool,
 }
 
@@ -44,13 +44,73 @@ pub struct SystemServices {
     pub lan_ip: &'static str,
     pub wifi_connected: bool,
     pub wifi_ip: &'static str,
-    pub active_ssid: &'static str,
+    pub active_ssid: alloc::string::String,
     pub custom_ssid: Option<alloc::string::String>,
     pub last_ping_ms: u32,
 }
 
+fn load_wifi_from_uefi_fs() -> Option<Vec<WifiNetwork>> {
+    let path = uefi::CString16::try_from("\\EFI\\BOOT\\wifi_scan.txt").ok()?;
+    let fs_proto = uefi::boot::get_image_file_system(uefi::boot::image_handle()).ok()?;
+    let mut fs = uefi::fs::FileSystem::new(fs_proto);
+    let bytes = fs.read(path.as_ref()).ok()?;
+    parse_wifi_scan_txt(&bytes)
+}
+
+fn parse_wifi_scan_txt(bytes: &[u8]) -> Option<Vec<WifiNetwork>> {
+    let text = core::str::from_utf8(bytes).ok()?;
+    let mut nets = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() >= 4 {
+            let ssid = alloc::string::String::from(parts[0].trim());
+            let band = alloc::string::String::from(parts[1].trim());
+            let security = alloc::string::String::from(parts[2].trim());
+            let signal_pct: u8 = parts[3].trim().parse().unwrap_or(75);
+            let connected = if parts.len() >= 5 {
+                parts[4].trim() == "1" || parts[4].trim().eq_ignore_ascii_case("true")
+            } else {
+                false
+            };
+            nets.push(WifiNetwork {
+                ssid,
+                band,
+                security,
+                signal_pct,
+                connected,
+            });
+        }
+    }
+    if nets.is_empty() {
+        None
+    } else {
+        Some(nets)
+    }
+}
+
+pub fn load_device_wifi() -> Vec<WifiNetwork> {
+    if let Some(nets) = load_wifi_from_uefi_fs() {
+        return nets;
+    }
+    crate::wifi_data::default_scanned_networks()
+}
+
 impl SystemServices {
     pub fn new() -> Self {
+        let mut nets = load_device_wifi();
+        let active = if let Some(first_conn) = nets.iter().find(|n| n.connected) {
+            first_conn.ssid.clone()
+        } else if let Some(first) = nets.first_mut() {
+            first.connected = true;
+            first.ssid.clone()
+        } else {
+            alloc::string::String::from("Zenkai-Lab-5G")
+        };
+
         Self {
             apt_packages: vec![
                 AptPackage { name: "aptitude", version: "0.8.13-5", size_kb: 1420, category: "admin", description: "Terminal-based package manager (aliased as apt)", installed: true },
@@ -73,17 +133,12 @@ impl SystemServices {
                 SnapApp { name: "docker-cli", version: "24.0.7", size_mb: 44, publisher: "Docker*", description: "Container runtime & image builder", installed: false },
                 SnapApp { name: "vlc-media", version: "3.0.18", size_mb: 64, publisher: "VideoLAN*", description: "Universal multimedia player", installed: false },
             ],
-            wifi_networks: vec![
-                WifiNetwork { ssid: "Zenkai-Lab-5G", signal_pct: 94, security: "WPA3-SAE", band: "5 GHz", connected: true },
-                WifiNetwork { ssid: "Jain-Campus-WiFi", signal_pct: 78, security: "WPA2-EAP", band: "5 GHz", connected: false },
-                WifiNetwork { ssid: "Swapnil-iPhone-Hotspot", signal_pct: 86, security: "WPA2-PSK", band: "2.4 GHz", connected: false },
-                WifiNetwork { ssid: "Lab-Guest-Open", signal_pct: 52, security: "Open", band: "2.4 GHz", connected: false },
-            ],
+            wifi_networks: nets,
             lan_connected: true,
             lan_ip: "10.0.2.15/24",
             wifi_connected: true,
             wifi_ip: "192.168.1.104/24",
-            active_ssid: "Zenkai-Lab-5G",
+            active_ssid: active,
             custom_ssid: None,
             last_ping_ms: 14,
         }
@@ -93,13 +148,17 @@ impl SystemServices {
         if let Some(custom) = &self.custom_ssid {
             custom.as_str()
         } else {
-            self.active_ssid
+            &self.active_ssid
         }
     }
 
     pub fn connect_custom_wifi(&mut self, ssid: &str) {
+        self.active_ssid = alloc::string::String::from(ssid);
         self.custom_ssid = Some(alloc::string::String::from(ssid));
         self.wifi_connected = true;
+        for net in self.wifi_networks.iter_mut() {
+            net.connected = net.ssid == ssid;
+        }
     }
 
     pub fn dpkg_status(&self) -> alloc::string::String {
@@ -206,25 +265,24 @@ impl SystemServices {
             net.connected = i == idx;
         }
         self.wifi_connected = true;
-        self.active_ssid = self.wifi_networks[idx].ssid;
+        self.active_ssid = self.wifi_networks[idx].ssid.clone();
+        self.custom_ssid = None;
     }
 
     pub fn refresh_wifi_scan(&mut self) {
-        if self.wifi_networks.len() == 4 {
-            self.wifi_networks.push(WifiNetwork {
-                ssid: "Zenkai-Faculty-5G",
-                signal_pct: 74,
-                security: "WPA3-Enterprise",
-                band: "5 GHz",
-                connected: false,
-            });
+        let mut fresh = load_device_wifi();
+        if fresh.is_empty() {
+            fresh = crate::wifi_data::default_scanned_networks();
         }
-        let signals = [96, 84, 88, 56, 75];
-        for (i, net) in self.wifi_networks.iter_mut().enumerate() {
-            if i < signals.len() {
-                net.signal_pct = signals[i];
-            }
+        let tsc = crate::timer::read_tsc();
+        // Slightly vary signal percentages to reflect real-world live RF fluctuations
+        for (i, net) in fresh.iter_mut().enumerate() {
+            let delta = ((tsc.wrapping_add(i as u64 * 17) % 7) as i16) - 3;
+            let new_sig = (net.signal_pct as i16 + delta).clamp(30, 99) as u8;
+            net.signal_pct = new_sig;
+            net.connected = self.wifi_connected && net.ssid == self.active_ssid;
         }
+        self.wifi_networks = fresh;
     }
 
     pub fn toggle_lan(&mut self) {
