@@ -79,7 +79,7 @@ impl Desktop {
             pkg_cursor: 0,
             wifi_cursor: 0,
             control_center_open: false,
-            window_maximized: false,
+            window_maximized: true,
             r19_last_summary: String::from("Click 'Run R19 Benchmark' to compare FIFO vs LRU vs OPT live."),
             status_msg: String::from("Navigate tabs: ← / → or Tab | Select: ↑ / ↓ | Run: Enter | Scan Wi-Fi: S"),
             cmd_line: String::new(),
@@ -92,9 +92,9 @@ impl Desktop {
 
     fn window_bounds(&self, w: usize, h: usize) -> (usize, usize, usize, usize) {
         if self.window_maximized {
-            let win_w = w.saturating_sub(24);
-            let win_h = h.saturating_sub(106);
-            (12, 42, win_w, win_h)
+            let win_w = w.saturating_sub(16);
+            let win_h = h.saturating_sub(86);
+            (8, 38, win_w, win_h)
         } else {
             let win_w = 1100.min(w.saturating_sub(64));
             let win_h = 610.min(h.saturating_sub(124));
@@ -182,6 +182,17 @@ impl Desktop {
                     Key::Special(ScanCode::FUNCTION_4) => { self.switch_tab(DesktopTab::System); continue; }
                     Key::Special(ScanCode::FUNCTION_5) => {
                         self.control_center_open = !self.control_center_open;
+                        self.needs_full_redraw = true;
+                        continue;
+                    }
+                    Key::Special(ScanCode::FUNCTION_11) => {
+                        self.window_maximized = !self.window_maximized;
+                        let mut con = GLOBAL_CONSOLE.lock();
+                        if let Some(fb) = &con.fb {
+                            let (nwx, nwy, nww, nwh) = self.window_bounds(fb.width, fb.height);
+                            con.set_viewport(nwx + 24, nwy + 56, nww.saturating_sub(48), nwh.saturating_sub(74), Color::SURFACE);
+                        }
+                        drop(con);
                         self.needs_full_redraw = true;
                         continue;
                     }
@@ -630,7 +641,19 @@ impl Desktop {
                     kprintln!();
                     let line = self.cmd_line.clone();
                     self.cmd_line.clear();
-                    shell.dispatch(&line, services, hw);
+                    let trimmed = line.trim();
+                    if trimmed == "fullscreen" || trimmed == "max" || trimmed == "maximize" {
+                        self.window_maximized = !self.window_maximized;
+                        let mut con = GLOBAL_CONSOLE.lock();
+                        if let Some(fb) = &con.fb {
+                            let (nwx, nwy, nww, nwh) = self.window_bounds(fb.width, fb.height);
+                            con.set_viewport(nwx + 24, nwy + 56, nww.saturating_sub(48), nwh.saturating_sub(74), Color::SURFACE);
+                        }
+                        drop(con);
+                        self.needs_full_redraw = true;
+                    } else {
+                        shell.dispatch(&line, services, hw);
+                    }
                     shell.print_prompt();
                 } else if ch == '\x08' || ch == '\x7f' {
                     if !self.cmd_line.is_empty() {
