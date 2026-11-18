@@ -21,9 +21,18 @@ pub fn read_tsc() -> u64 {
     }
     #[cfg(target_arch = "aarch64")]
     {
-        use core::sync::atomic::{AtomicU64, Ordering};
-        static CYCLE_COUNTER: AtomicU64 = AtomicU64::new(100_000);
-        CYCLE_COUNTER.fetch_add(2_400_000, Ordering::Relaxed)
+        let cnt: u64;
+        let freq: u64;
+        unsafe {
+            core::arch::asm!("mrs {}, cntvct_el0", out(reg) cnt, options(nomem, nostack, preserves_flags));
+            core::arch::asm!("mrs {}, cntfrq_el0", out(reg) freq, options(nomem, nostack, preserves_flags));
+        }
+        let f = freq.max(1);
+        // Scale ARM generic timer ticks to an equivalent 2.4 GHz cycle count without u64 overflow
+        let secs = cnt / f;
+        let rem = cnt % f;
+        secs.saturating_mul(2_400_000_000)
+            .saturating_add((rem.saturating_mul(2_400_000_000)) / f)
     }
 }
 

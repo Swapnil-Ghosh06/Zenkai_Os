@@ -72,34 +72,34 @@ fn print_boot_banner() {
 fn print_boot_time_table(hw: &HardwareInfo) {
     kprintln!();
     kinfo!("BOOT-TIME", "Component Boot-Time Progression Table (Faculty Requirement):");
-    kprintln!("  ┌──────────────────────────────────────────────────────────────────────────┐");
-    kprintln!("  │ Stage │ Component Added                        │ Total Time  │ +Delta     │");
-    kprintln!("  ├──────────────────────────────────────────────────────────────────────────┤");
-    kprintln!("  │  S0   │ Minimal Micro-OS Base (Kernel + Shell) │  1.42 s     │ baseline   │");
+    kprintln!("  +-------+--------------------------------------+-----------+----------+");
+    kprintln!("  | Stage | Component Added                      | Total     | +Delta   |");
+    kprintln!("  +-------+--------------------------------------+-----------+----------+");
+    kprintln!("  |  S0   | Minimal Micro-OS Base (Kernel+Shell) |  1.420 s  | baseline |");
 
     // Print live-measured stages from boot_screen
     let mut cumulative_ms: u64 = 1420;
     let deltas_ms: [(&'static str, u64, &'static str); 4] = [
-        ("Network Stack (WiFi 802.11ax + GigE LAN)", 760, "wpa_supplicant + DHCP negotiation"),
-        ("Hardware Drivers (ACPI, DRM, Touchpad)",   470, "udevd PCI probe + firmware load"),
-        ("Package Manager (APT / Aptitude)",          260, "dpkg database + apt-daily.timer"),
-        ("In-Built Store (Snapstore / snapd)",       1240, "AppArmor + squashfs snap mounts"),
+        ("Network Stack (WiFi 802.11ax + LAN)", 760, "wpa_supplicant + DHCP negotiation"),
+        ("Hardware Drivers (ACPI, DRM, Input)", 470, "udevd PCI probe + firmware load"),
+        ("Package Manager (APT / Aptitude)",    260, "dpkg database + apt-daily.timer"),
+        ("In-Built Store (Snapstore / snapd)", 1240, "AppArmor + squashfs snap mounts"),
     ];
     for (i, &(label, delta_ms, _note)) in deltas_ms.iter().enumerate() {
         cumulative_ms += delta_ms;
         let total_s = cumulative_ms / 1000;
         let total_ms = cumulative_ms % 1000;
-        kprintln!("  │  S{}   │ {:<38} │ {}.{:03} s   │ +{:>4} ms   │",
+        kprintln!("  |  S{}   | {:<36} | {}.{:03} s  | +{:>4} ms |",
             i + 1, label, total_s, total_ms, delta_ms);
     }
-    kprintln!("  └──────────────────────────────────────────────────────────────────────────┘");
+    kprintln!("  +-------+--------------------------------------+-----------+----------+");
 
     // Print live TSC-measured stages from visual boot sequence
     if !hw.boot_stages.is_empty() {
         kprintln!();
         kinfo!("BOOT-TIME", "Live Kernel Boot Stage Measurements (TSC-based):");
         for s in &hw.boot_stages {
-            kprintln!("  [{:>3}%] {:<38} | {:>4} ms | {} TSC cycles",
+            kprintln!("  [{:>3}%] {:<32} | {:>4} ms | {} cycles",
                 s.target_pct, s.name, s.elapsed_ms, s.cycles);
         }
     }
@@ -120,6 +120,35 @@ fn main() -> Status {
     let gop_init_result = (|| -> uefi::Result<Framebuffer> {
         let handle = uefi::boot::get_handle_for_protocol::<GraphicsOutput>()?;
         let mut gop = uefi::boot::open_protocol_exclusive::<GraphicsOutput>(handle)?;
+        let best_mode = gop
+            .modes()
+            .filter(|m| {
+                let info = m.info();
+                let (mw, mh) = info.resolution();
+                let fmt_ok = matches!(
+                    info.pixel_format(),
+                    uefi::proto::console::gop::PixelFormat::Rgb
+                        | uefi::proto::console::gop::PixelFormat::Bgr
+                );
+                fmt_ok && mw >= 1024 && mh >= 720 && mw <= 1920 && mh <= 1200
+            })
+            .min_by_key(|m| {
+                let (mw, mh) = m.info().resolution();
+                if (mw, mh) == (1280, 800) {
+                    0usize
+                } else if (mw, mh) == (1280, 720) {
+                    1
+                } else if (mw, mh) == (1024, 768) {
+                    2
+                } else {
+                    3 + mw.abs_diff(1280) + mh.abs_diff(800)
+                }
+            });
+        if let Some(m) = best_mode {
+            if gop.current_mode_info().resolution() != m.info().resolution() {
+                let _ = gop.set_mode(&m);
+            }
+        }
         let mode = gop.current_mode_info();
         let (width, height) = mode.resolution();
         let stride = mode.stride();

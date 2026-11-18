@@ -20,13 +20,13 @@ use crate::{kerror, kinfo, kok, kprintln};
 
 pub fn run_ca2_investigation() {
     kprintln!();
-    kinfo!("CA-2", "================================================================================");
-    kinfo!("CA-2", "     CONTINUOUS ASSESSMENT CA-2: OS PERFORMANCE INVESTIGATION (10 MARKS)        ");
-    kinfo!("CA-2", "     Experimental Comparison of Page Replacement Under AI/ML Access Patterns    ");
-    kinfo!("CA-2", "     Author: Swapnil Ghosh | USN: 25BTRCL267 | Class: AIML-E                   ");
-    kinfo!("CA-2", "================================================================================");
-    kinfo!("CA-2", "Workloads: Sequential (Tensor Scan), Random (Embedding), Bursty (Mini-Batch), Strided (Conv)");
-    kinfo!("CA-2", "Evaluating: FIFO, LRU, and Belady's Optimal (OPT) across frame sizes [2, 4, 8, 12, 16, 32]");
+    kinfo!("CA-2", "======================================================================");
+    kinfo!("CA-2", "  CONTINUOUS ASSESSMENT CA-2: OS PERFORMANCE INVESTIGATION (10 MARKS) ");
+    kinfo!("CA-2", "  Experimental Comparison of Page Replacement Under AI/ML Workloads   ");
+    kinfo!("CA-2", "  Author: Swapnil Ghosh | USN: 25BTRCL267 | Class: AIML-E             ");
+    kinfo!("CA-2", "======================================================================");
+    kinfo!("CA-2", "Workloads: Sequential, Random, Bursty (Mini-Batch), Strided (Conv)");
+    kinfo!("CA-2", "Policies : FIFO, LRU, Belady OPT | Frames: [2, 4, 8, 12, 16, 32]");
     kprintln!();
 
     // Delegate to the full R19 simulation engine
@@ -70,18 +70,17 @@ pub fn correct_lru_faults(refs: &[u8], frames: usize) -> usize {
 
 pub fn run_ca3_debugging_challenge() {
     kprintln!();
-    kinfo!("CA-3", "================================================================================");
-    kinfo!("CA-3", "     CONTINUOUS ASSESSMENT CA-3: OS DESIGN & DEBUGGING CHALLENGE (10 MARKS)     ");
-    kinfo!("CA-3", "     Challenge F1: Diagnosing & Correcting an LRU Page-Replacement Defect       ");
-    kinfo!("CA-3", "     Author: Swapnil Ghosh | USN: 25BTRCL267 | Class: AIML-E                   ");
-    kinfo!("CA-3", "================================================================================");
+    kinfo!("CA-3", "======================================================================");
+    kinfo!("CA-3", "  CONTINUOUS ASSESSMENT CA-3: DESIGN & DEBUGGING CHALLENGE (10 MARKS) ");
+    kinfo!("CA-3", "  Challenge F1: Diagnosing & Correcting an LRU Page-Replacement Bug   ");
+    kinfo!("CA-3", "  Author: Swapnil Ghosh | USN: 25BTRCL267 | Class: AIML-E             ");
+    kinfo!("CA-3", "======================================================================");
     kprintln!();
 
     kinfo!("CA-3", "1. ROOT-CAUSE SUMMARY:");
-    kprintln!("   Defect: In the faulty simulator, a cache hit failed to update recency metadata.");
-    kprintln!("           (Missing operation: cache.move_to_end(page) on hit).");
-    kprintln!("   Effect: Resident pages maintained insertion order, causing LRU to degrade to FIFO.");
-    kprintln!("   Fix   : On hit, remove page from its current position and push to the back (MRU).");
+    kprintln!("   Defect: Cache hit failed to refresh recency metadata (move_to_end).");
+    kprintln!("   Effect: Resident pages kept insertion order, degrading LRU to FIFO.");
+    kprintln!("   Fix   : On hit, move page to back (MRU) position.");
     kprintln!();
 
     // Table 2 Regression Test Suite from CA3_Design_and_Debugging.pdf
@@ -95,9 +94,9 @@ pub fn run_ca3_debugging_challenge() {
     ];
 
     kinfo!("CA-3", "2. EXECUTING REGRESSION TEST SUITE (Table 2 from Report):");
-    kprintln!("  ┌──────────────────────────────┬────────┬───────────────┬─────────────┬──────┬─────┬────────┐");
-    kprintln!("  │ Test Case                    │ Frames │ Defective LRU │ Correct LRU │ FIFO │ OPT │ Status │");
-    kprintln!("  ├──────────────────────────────┼────────┼───────────────┼─────────────┼──────┼─────┼────────┤");
+    kprintln!("  +-----------------------------+----+--------+-------+------+-----+------+");
+    kprintln!("  | Test Case                   | Fr | DefLRU | CrLRU | FIFO | OPT | Stat |");
+    kprintln!("  +-----------------------------+----+--------+-------+------+-----+------+");
 
     let mut all_passed = true;
     for &(name, refs, frames) in test_suite {
@@ -123,11 +122,11 @@ pub fn run_ca3_debugging_challenge() {
             all_passed = false;
         }
 
-        let status = if passed { "PASS ✓" } else { "FAIL ✗" };
-        kprintln!("  │ {:<28} │ {:>6} │ {:>13} │ {:>11} │ {:>4} │ {:>3} │ {:>6} │",
+        let status = if passed { "PASS" } else { "FAIL" };
+        kprintln!("  | {:<27} | {:>2} | {:>6} | {:>5} | {:>4} | {:>3} | {:<4} |",
             name, frames, def_f, cor_f, fifo_f, opt_f, status);
     }
-    kprintln!("  └──────────────────────────────┴────────┴───────────────┴─────────────┴──────┴─────┴────────┘");
+    kprintln!("  +-----------------------------+----+--------+-------+------+-----+------+");
 
     kprintln!();
     kinfo!("CA-3", "3. INVARIANT VERIFICATION:");
@@ -149,15 +148,15 @@ pub fn run_ca3_debugging_challenge() {
 
 pub fn run_ca5_linux_systems_challenge() {
     kprintln!();
-    kinfo!("CA-5", "================================================================================");
-    kinfo!("CA-5", "   CONTINUOUS ASSESSMENT CA-5: LINUX SYSTEMS ENGINEERING CHALLENGE (10 MARKS)   ");
-    kinfo!("CA-5", "   Challenge L20: Observing Memory Behaviour Under AI/ML Access Workloads       ");
-    kinfo!("CA-5", "   Author: Swapnil Ghosh | USN: 25BTRCL267 | Class: AIML-E                     ");
-    kinfo!("CA-5", "================================================================================");
+    kinfo!("CA-5", "======================================================================");
+    kinfo!("CA-5", "  CONTINUOUS ASSESSMENT CA-5: LINUX SYSTEMS CHALLENGE (10 MARKS)      ");
+    kinfo!("CA-5", "  Challenge L20: Observing Memory Under AI/ML Access Workloads        ");
+    kinfo!("CA-5", "  Author: Swapnil Ghosh | USN: 25BTRCL267 | Class: AIML-E             ");
+    kinfo!("CA-5", "======================================================================");
     kprintln!();
 
-    kinfo!("CA-5", "Target Mapping: 8,192 pages x 4,096 bytes = 33,554,432 bytes (32 MiB anonymous)");
-    kinfo!("CA-5", "Methodology: Cold First-Touch pass (demand paging) vs Warm Replay pass (resident)");
+    kinfo!("CA-5", "Mapping: 8,192 pages x 4,096 bytes = 32 MiB anonymous region");
+    kinfo!("CA-5", "Method : Cold First-Touch pass (demand paging) vs Warm Replay pass");
     kprintln!();
 
     // Workload results representing Table 1 from CA5_Linux_Systems_Engineering.pdf
@@ -169,22 +168,22 @@ pub fn run_ca5_linux_systems_challenge() {
         ("Strided",    1024, 1024, 0, 0,  4.85, 3.39),
     ];
 
-    kinfo!("CA-5", "EXPERIMENTAL RESULTS (Table 1: Process-Level Measurements Across Phases):");
-    kprintln!("  ┌────────────┬──────────────┬─────────────┬────────────┬────────────┬───────────┬──────────┐");
-    kprintln!("  │ Pattern    │ Unique Pages │ First Minor │ Warm Minor │ Major Flt  │ First ms  │ Warm ms  │");
-    kprintln!("  ├────────────┼──────────────┼─────────────┼────────────┼────────────┼───────────┼──────────┤");
+    kinfo!("CA-5", "EXPERIMENTAL RESULTS (Table 1: Phase Measurements):");
+    kprintln!("  +------------+-------+----------+---------+-------+--------+--------+");
+    kprintln!("  | Pattern    | Pages | 1stMinor | WrmMin  | Major | 1st ms | Wrm ms |");
+    kprintln!("  +------------+-------+----------+---------+-------+--------+--------+");
 
     for &(pat, unique, first_min, warm_min, maj, first_ms, warm_ms) in workloads {
-        kprintln!("  │ {:<10} │ {:>12} │ {:>11} │ {:>10} │ {:>10} │ {:>8.2}  │ {:>7.2}  │",
+        kprintln!("  | {:<10} | {:>5} | {:>8} | {:>7} | {:>5} | {:>6.2} | {:>6.2} |",
             pat, unique, first_min, warm_min, maj, first_ms, warm_ms);
     }
-    kprintln!("  └────────────┴──────────────┴─────────────┴────────────┴────────────┴───────────┴──────────┘");
+    kprintln!("  +------------+-------+----------+---------+-------+--------+--------+");
 
     kprintln!();
     kinfo!("CA-5", "KEY ENGINEERING FINDINGS:");
-    kok!("CA-5", "1. Demand Paging Verified: First-touch minor faults track distinct pages written (8192 vs 1024).");
-    kok!("CA-5", "2. Zero Warm Faults      : Replay of resident working set generates 0 minor and 0 major faults.");
-    kok!("CA-5", "3. Speedup Factor        : Warm execution is 3.5x to 4.1x faster than cold initial population.");
-    kok!("CA-5", "4. Strided Footprint     : Stride-8 touches only 1024 pages (4 MiB RSS) vs 32 MiB for full scans.");
+    kok!("CA-5", "1. Demand Paging: First-touch minor faults match pages written.");
+    kok!("CA-5", "2. Zero Warm Faults: Resident replay produces 0 minor/major faults.");
+    kok!("CA-5", "3. Speedup Factor: Warm replay is 3.5x to 4.1x faster than cold.");
+    kok!("CA-5", "4. Strided RSS: Stride-8 touches 1024 pages (4 MiB vs 32 MiB).");
     kprintln!();
 }

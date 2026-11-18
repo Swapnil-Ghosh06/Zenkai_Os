@@ -54,6 +54,11 @@ echo "       Course : 25PCCS201 Operating Systems  |  CA-6 Flagship Project"
 echo "════════════════════════════════════════════════════════════════════════════"
 echo ""
 
+# ── [0/6] Live Host Wi-Fi Scan ─────────────────────────────────────────────────
+echo -e "\033[36m[0/6] Scanning live nearby Wi-Fi networks using host device adapter...\033[0m"
+python3 "$SCRIPT_DIR/tools/scan_wifi.py" || true
+export ZENKAI_SKIP_SCAN=1
+
 # ── [1/6] Compile Rust UEFI Kernel (Universal Dual-Architecture) ──────────────
 echo -e "\033[36m[1/6] Compiling Zenkai OS Rust UEFI kernels (x86_64 + aarch64 universal release)...\033[0m"
 cargo build --release --target x86_64-unknown-uefi 2>&1 | grep -v "^$" | tail -4
@@ -88,6 +93,7 @@ cp "$EFI_BIN_AA64" "$ISO_STAGE/EFI/BOOT/ZENKAIAA64.EFI"
 if [ -f "$SCRIPT_DIR/wifi_scan.txt" ]; then
     cp "$SCRIPT_DIR/wifi_scan.txt" "$GRUB_EFI_DIR/wifi_scan.txt"
     cp "$SCRIPT_DIR/wifi_scan.txt" "$ISO_STAGE/EFI/BOOT/wifi_scan.txt"
+    cp "$SCRIPT_DIR/wifi_scan.txt" "$ISO_STAGE/wifi_scan.txt"
     cp "$SCRIPT_DIR/wifi_scan.txt" "$ESP_DIR/EFI/BOOT/wifi_scan.txt"
 fi
 
@@ -189,6 +195,10 @@ mcopy -i "$ESP_IMG" "$GRUB_EFI_BIN"  "::EFI/BOOT/BOOTX64.EFI"
 mcopy -i "$ESP_IMG" "$EFI_BIN"       "::EFI/BOOT/ZENKAIOS.EFI"
 mcopy -i "$ESP_IMG" "$EFI_BIN_AA64"  "::EFI/BOOT/BOOTAA64.EFI"
 mcopy -i "$ESP_IMG" "$EFI_BIN_AA64"  "::EFI/BOOT/ZENKAIAA64.EFI"
+if [ -f "$SCRIPT_DIR/wifi_scan.txt" ]; then
+    mcopy -o -i "$ESP_IMG" "$SCRIPT_DIR/wifi_scan.txt" "::EFI/BOOT/wifi_scan.txt"
+    mcopy -o -i "$ESP_IMG" "$SCRIPT_DIR/wifi_scan.txt" "::wifi_scan.txt"
+fi
 
 echo -e "\033[32m[✓] EFI System Partition image: $ESP_IMG (16 MB)\033[0m"
 
@@ -266,6 +276,11 @@ if [ "$DO_VBOX" = "1" ] || command -v VBoxManage &>/dev/null; then
 
         echo -e "\033[32m[✓] VirtualBox OVA: $OUTPUT_OVA\033[0m"
         echo -e "  Import in VirtualBox: File → Import Appliance → $OUTPUT_OVA"
+
+        if VBoxManage showvminfo "Zenkai OS" &>/dev/null; then
+            VBoxManage setextradata "Zenkai OS" VBoxInternal2/EfiGraphicsResolution 1280x800 2>/dev/null || true
+            echo -e "\033[32m[✓] Updated VirtualBox VM 'Zenkai OS' EFI GOP resolution to 1280x800\033[0m"
+        fi
     fi
 else
     echo ""

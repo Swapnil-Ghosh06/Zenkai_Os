@@ -18,6 +18,7 @@ BUILD_MODE="${1:-gui}"
 
 echo -e "\x1b[36m[*] Scanning live nearby Wi-Fi networks using host device adapter...\x1b[0m"
 python3 "$PROJECT_DIR/tools/scan_wifi.py" || true
+export ZENKAI_SKIP_SCAN=1
 
 echo -e "\x1b[36m[*] Building Zenkai OS (x86_64-unknown-uefi)...\x1b[0m"
 cargo build --release

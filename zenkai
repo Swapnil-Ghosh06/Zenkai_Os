@@ -34,6 +34,7 @@ fi
 build_kernel() {
     echo -e "\x1b[36m[*] Scanning live nearby Wi-Fi networks using host device adapter...\x1b[0m"
     python3 "$PROJECT_DIR/tools/scan_wifi.py" || true
+    export ZENKAI_SKIP_SCAN=1
     echo -e "\x1b[36m[*] Compiling Zenkai OS release binary (x86_64-unknown-uefi)...\x1b[0m"
     cargo build --release --target x86_64-unknown-uefi
     mkdir -p "$ESP_DIR/EFI/BOOT"
@@ -80,10 +81,8 @@ case "$MODE" in
         python3 "$PROJECT_DIR/test_runner.py"
         ;;
     live|iso|iso-boot)
-        if [ ! -f "$PROJECT_DIR/zenkai_os_live.iso" ]; then
-            echo -e "\x1b[33m[*] zenkai_os_live.iso not found. Building it now...\x1b[0m"
-            bash "$PROJECT_DIR/build_iso.sh"
-        fi
+        echo -e "\x1b[36m[*] Refreshing live host Wi-Fi scan & rebuilding Live ISO...\x1b[0m"
+        bash "$PROJECT_DIR/build_iso.sh"
         echo -e "\x1b[32m[*] Booting actual Zenkai OS Live ISO (Hybrid UEFI image)...\x1b[0m"
         echo -e "\x1b[36m[+] Featuring GNU GRUB 2.12 UEFI Bootloader & 5-Stage Animated Splash\x1b[0m"
         echo -e "\x1b[33m[!] Author: Swapnil Ghosh 25BTRCL267 AIML-E\x1b[0m\n"

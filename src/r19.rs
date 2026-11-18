@@ -166,11 +166,11 @@ pub fn gen_random(out: &mut [u8], seed: u64) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 pub fn run_r19_full_benchmark() {
-    kinfo!("R19", "================================================================================");
-    kinfo!("R19", "         SWAPNIL GHOSH: R19 AI/ML PAGE REPLACEMENT RESEARCH ENGINE              ");
-    kinfo!("R19", "                 Zenkai-OS Kernel Verification Module (CA-6)                    ");
-    kinfo!("R19", "================================================================================");
-    kinfo!("R19", "Reference Length: {} | Page Space: {} pages | Test Frames: {:?}",
+    kinfo!("R19", "======================================================================");
+    kinfo!("R19", "      SWAPNIL GHOSH: R19 AI/ML PAGE REPLACEMENT RESEARCH ENGINE       ");
+    kinfo!("R19", "              Zenkai-OS Kernel Verification Module (CA-6)             ");
+    kinfo!("R19", "======================================================================");
+    kinfo!("R19", "Refs: {} | Page Space: {} | Frames: {:?}",
            REF_LENGTH, PAGE_SPACE, TEST_FRAMES);
 
     let mut refs = [0u8; REF_LENGTH];
@@ -186,9 +186,9 @@ pub fn run_r19_full_benchmark() {
         gen_fn(&mut refs);
         kinfo!("R19", "");
         kinfo!("R19", ">>> Workload Pattern: {} [{}]", name, desc);
-        kinfo!("R19", "{:<6} | {:<12} | {:<12} | {:<12} | {:<10} | {:<12}",
-               "Frames", "FIFO Faults", "LRU Faults", "OPT Faults", "OPT Gap", "LRU Better?");
-        kinfo!("R19", "--------------------------------------------------------------------------------");
+        kinfo!("R19", "{:<6} | {:<9} | {:<9} | {:<9} | {:<7} | {:<10}",
+               "Frames", "FIFO Flt", "LRU Flt", "OPT Flt", "OPT Gap", "LRU Better");
+        kinfo!("R19", "----------------------------------------------------------------------");
 
         let mut results: Vec<SimResult> = Vec::new();
 
@@ -209,7 +209,7 @@ pub fn run_r19_full_benchmark() {
                 lru_better: lru_f < fifo_f,
             };
 
-            kinfo!("R19", "{:<6} | {:<12} | {:<12} | {:<12} | {:<10} | {:<12}",
+            kinfo!("R19", "{:<6} | {:<9} | {:<9} | {:<9} | {:<7} | {:<10}",
                    res.frames,
                    res.fifo_faults,
                    res.lru_faults,
@@ -247,15 +247,15 @@ pub fn run_r19_full_benchmark() {
             "Random" => {
                 let diff = (results[2].fifo_faults as isize - results[2].lru_faults as isize).abs();
                 if diff <= 10 {
-                    kok!("R19", "[HYPOTHESIS H2 CONFIRMED]: FIFO ≈ LRU under random accesses. Absence of predictive signal.");
+                    kok!("R19", "[HYPOTHESIS H2 CONFIRMED]: FIFO ~= LRU under random accesses.");
                 }
             }
             _ => {}
         }
     }
 
-    kok!("R19", "================================================================================");
+    kok!("R19", "======================================================================");
     kok!("R19", "All 5 Research Hypotheses (H1-H5) successfully replicated inside the Micro-OS!");
-    kok!("R19", "================================================================================");
+    kok!("R19", "======================================================================");
 }
 
