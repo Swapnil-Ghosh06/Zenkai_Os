@@ -88,19 +88,13 @@ struct DesktopShortcut {
     os_lab_r19: bool,
 }
 
-const DESKTOP_SHORTCUTS: [DesktopShortcut; 12] = [
-    DesktopShortcut { label: "File System", icon: AppIcon::FileSystem, tab: DesktopTab::Files, files_path: Some("/"), os_lab_r19: false },
+const DESKTOP_SHORTCUTS: [DesktopShortcut; 6] = [
     DesktopShortcut { label: "Home", icon: AppIcon::HomeFolder, tab: DesktopTab::Files, files_path: Some("/home/swapnil"), os_lab_r19: false },
-    DesktopShortcut { label: "File Manager", icon: AppIcon::FileManager, tab: DesktopTab::Files, files_path: Some("/home/swapnil/Desktop"), os_lab_r19: false },
     DesktopShortcut { label: "Terminal", icon: AppIcon::Terminal, tab: DesktopTab::Terminal, files_path: None, os_lab_r19: false },
-    DesktopShortcut { label: "Software Store", icon: AppIcon::Software, tab: DesktopTab::Packages, files_path: None, os_lab_r19: false },
+    DesktopShortcut { label: "R19 Research", icon: AppIcon::OsLab, tab: DesktopTab::OsLab, files_path: None, os_lab_r19: true },
     DesktopShortcut { label: "AI Profiles", icon: AppIcon::Profiles, tab: DesktopTab::Profiles, files_path: None, os_lab_r19: false },
-    DesktopShortcut { label: "OS Concurrency", icon: AppIcon::OsLab, tab: DesktopTab::OsLab, files_path: None, os_lab_r19: false },
-    DesktopShortcut { label: "R19 Research", icon: AppIcon::Monitor, tab: DesktopTab::OsLab, files_path: None, os_lab_r19: true },
-    DesktopShortcut { label: "Wi-Fi & Net", icon: AppIcon::Network, tab: DesktopTab::Network, files_path: None, os_lab_r19: false },
-    DesktopShortcut { label: "Snake Game", icon: AppIcon::Snake, tab: DesktopTab::Snake, files_path: None, os_lab_r19: false },
-    DesktopShortcut { label: "Zenkai Notes", icon: AppIcon::Notes, tab: DesktopTab::Notes, files_path: None, os_lab_r19: false },
-    DesktopShortcut { label: "System Monitor", icon: AppIcon::Monitor, tab: DesktopTab::System, files_path: None, os_lab_r19: false },
+    DesktopShortcut { label: "Sticky Notes", icon: AppIcon::Notes, tab: DesktopTab::Notes, files_path: None, os_lab_r19: false },
+    DesktopShortcut { label: "Monitor", icon: AppIcon::Monitor, tab: DesktopTab::System, files_path: None, os_lab_r19: false },
 ];
 
 const DOCK_ITEMS: [(&str, DesktopTab); 8] = [
@@ -366,6 +360,14 @@ impl Desktop {
                             self.needs_full_redraw = true;
                             continue;
                         }
+                        if self.active_tab == DesktopTab::Terminal && shell.py.repl_active {
+                            shell.py.repl_active = false;
+                            shell.py.block_buf.clear();
+                            kprintln!();
+                            crate::kinfo!("PYTHON", "Exited interactive Python REPL.");
+                            shell.print_prompt(services);
+                            continue;
+                        }
                     }
                     Key::Printable(c) if char::from(c) == '\t' => {
                         if self.active_tab == DesktopTab::Terminal && !self.cmd_line.is_empty() {
@@ -413,8 +415,8 @@ impl Desktop {
                         }
                     }
                     DesktopTab::Notes => {
-                        if let Some(cmd) = self.notes.handle_key(key) {
-                            self.run_terminal_command(cmd, shell, services, hw);
+                        if let Some(_cmd) = self.notes.handle_key(key) {
+                            self.run_notes_script(shell, services, hw);
                         } else {
                             self.render_active_window_only(services, hw, &mut mouse);
                         }
@@ -765,6 +767,7 @@ impl Desktop {
                 if mouse.in_rect(qx + 16, by1, btn_w, 34) {
                     if services.active_profile.is_none() {
                         services.activate_profile(0);
+                        shell.py.reset();
                     }
                     self.switch_tab(DesktopTab::Profiles);
                     return;
@@ -982,8 +985,8 @@ impl Desktop {
                 }
             }
             DesktopTab::Notes => {
-                if let Some(cmd) = self.notes.handle_click(mouse, wx, wy, ww, wh) {
-                    self.run_terminal_command(cmd, shell, services, hw);
+                if let Some(_cmd) = self.notes.handle_click(mouse, wx, wy, ww, wh) {
+                    self.run_notes_script(shell, services, hw);
                 } else {
                     self.needs_full_redraw = true;
                 }
@@ -1034,6 +1037,27 @@ impl Desktop {
             services.apt_packages.get(self.pkg_cursor).map(|p| p.cmd_hint).unwrap_or("apt list")
         };
         self.run_terminal_command(cmd, shell, services, hw);
+    }
+
+    fn run_notes_script(&mut self, shell: &mut Shell, services: &mut SystemServices, hw: &mut HardwareInfo) {
+        if let Some(lines) = self.notes.get_doc_lines("train_ai.py") {
+            self.switch_tab(DesktopTab::Terminal);
+            {
+                let mut con = GLOBAL_CONSOLE.lock();
+                con.scroll_to_bottom();
+            }
+            let venv = services.active_venv_label().unwrap_or("system");
+            kprintln!("python3 train_ai.py  # (.venv:{})", venv);
+            if !services.is_apt_installed("python3-ml") && services.active_profile.is_none() {
+                crate::kwarn!("PYTHON", "Activate 'AI Developer' profile or run 'apt install python3-ml' first.");
+            } else if let Err(e) = shell.py.exec_script_lines(&lines, services) {
+                crate::kerror!("PYTHON", "{}", e);
+            }
+            shell.print_prompt(services);
+            self.needs_full_redraw = true;
+        } else {
+            self.run_terminal_command("code train_ai.py", shell, services, hw);
+        }
     }
 
     fn toggle_selected_profile(&mut self, services: &mut SystemServices) {
@@ -2018,32 +2042,27 @@ impl Desktop {
     }
 
     fn home_grid_metrics(w: usize, h: usize) -> (usize, usize, usize) {
-        let cols = if w >= 920 { 3 } else { 2 };
-        let cell_w = if w >= 1100 { 134 } else { 114 };
-        let cell_h = if h >= 720 { 102 } else { 86 };
+        let cols = 2usize;
+        let cell_w = if w >= 1100 { 132 } else { 116 };
+        let cell_h = if h >= 720 { 104 } else { 90 };
         (cols, cell_w, cell_h)
     }
 
     fn right_widget_column(w: usize) -> Option<(usize, usize, usize)> {
-        if w < 780 {
+        if w < 760 {
             return None;
         }
-        let ww = 410usize.min(w.saturating_sub(480));
-        if ww < 280 {
+        let ww = 380usize.min(w.saturating_sub(380));
+        if ww < 260 {
             return None;
         }
         let wx = w.saturating_sub(ww + 24);
         Some((wx, 56, ww))
     }
 
-    fn quick_widget_bounds(w: usize, h: usize) -> Option<(usize, usize, usize, usize)> {
-        let (wx, wy, ww) = Self::right_widget_column(w)?;
-        let qy = wy + 96 + 14 + 178 + 14;
-        let qh = 144usize;
-        if qy + qh + 62 > h {
-            return None;
-        }
-        Some((wx, qy, ww, qh))
+    fn quick_widget_bounds(_w: usize, _h: usize) -> Option<(usize, usize, usize, usize)> {
+        // Minimal editorial desktop: no redundant 4-button quick-actions box
+        None
     }
 
     fn draw_home_desktop(
@@ -2162,30 +2181,25 @@ impl Desktop {
                 172,
                 Some((Color::GLASS_BORDER, 40)),
             );
-            fb.draw_aa_text(wx + 18, my + 13, &UI_HEADING, "Zenkai OS v1.0", Color::GLASS_TEXT, None);
+            fb.draw_aa_text(wx + 18, my + 13, &UI_HEADING, "Zenkai OS  |  R19", Color::GLASS_TEXT, None);
             let status_dot = if services.wifi_connected { Color::new(74, 222, 128) } else { Color::GLASS_MUTED };
             fb.draw_rounded_rect(wx + ww - 28, my + 20, 8, 8, 4, status_dot, None);
             fb.fill_rect_alpha(wx + 16, my + 44, ww - 32, 1, Color::GLASS_BORDER, 36);
 
-            let max_c = ((ww.saturating_sub(36)) / 9).max(24);
             let cpu_line = format!("CPU   {}", hw.cpu_vendor);
             let gop_line = format!("GOP   {}x{}  |  {} PCI", hw.gop_width, hw.gop_height, hw.pci_devices.len());
             let env_line = if let Some(p) = services.active_profile_info() {
-                format!("ENV   .venv:{}  (active)", p.venv_name)
+                format!("VENV  .venv:{}  (active)", p.venv_name)
             } else {
-                String::from("ENV   Clean system  (no .venv)")
+                String::from("VENV  Clean system  (ephemeral)")
             };
-            let pkg_line = format!(
-                "PKGS  {} apt  |  {} snap",
-                services.apt_installed_count(),
-                services.snap_installed_count()
-            );
+            let r19_line = String::from("R19   FIFO / LRU / OPT  Ready");
 
-            let rows = [cpu_line, gop_line, env_line, pkg_line];
+            let rows = [cpu_line, gop_line, env_line, r19_line];
+            let max_px = ww.saturating_sub(36);
             for (i, line) in rows.iter().enumerate() {
-                let fit: String = line.chars().take(max_c).collect();
                 let col = if i == 0 { Color::GLASS_TEXT } else { Color::GLASS_MUTED };
-                fb.draw_aa_text(wx + 18, my + 54 + i * 28, &TERM_MONO, &fit, col, None);
+                fb.draw_aa_text_clipped(wx + 18, my + 54 + i * 28, max_px, &TERM_MONO, line, col, None);
             }
 
             // Bottom Card: Quick Workspace Actions (uniform frosted buttons, zero neon outlines)
@@ -2414,46 +2428,44 @@ impl Desktop {
         fb.draw_rounded_rect(wx + ww - ab_w - 24, wy + 50, ab_w, 26, 7, Color::SURFACE_CARD, Some(ab_col));
         fb.draw_aa_text(wx + ww - ab_w - 15, wy + 51, &UI_SANS, &active_badge, ab_col, None);
 
-        let left_w = (ww / 3).clamp(210, 290);
+        let left_w = (ww / 3).clamp(200, 280);
         let list_y = wy + 88;
         for (i, prof) in services.profiles.iter().enumerate() {
             let ry = list_y + i * 68;
             let selected = i == self.profile_cursor;
             let is_active = services.active_profile == Some(i);
-            let bg = if selected { Color::SURFACE_HOVER } else { Color::SURFACE_CARD };
-            let brd = if is_active { Color::SAGE } else if selected { Color::VIOLET } else { Color::BORDER };
+            let bg = if selected { Color::SURFACE_HOVER } else { Color::SURFACE_ALT };
+            let brd = if is_active { Color::SAGE } else if selected { Color::INK_SOLID } else { Color::BORDER };
 
             fb.draw_rounded_rect(wx + 24, ry, left_w, 58, 10, bg, Some(brd));
-            fb.draw_aa_text(wx + 36, ry + 7, &UI_SANS, prof.name, Color::TEXT_PRIMARY, None);
+            fb.draw_aa_text_clipped(wx + 36, ry + 7, left_w.saturating_sub(24), &UI_SANS, prof.name, Color::TEXT_PRIMARY, None);
             let sub = if is_active {
                 format!("ACTIVE  |  .venv:{}", prof.venv_name)
             } else {
                 format!("{}  |  .venv:{}", prof.role_badge, prof.venv_name)
             };
             let sub_col = if is_active { Color::SAGE } else { Color::TEXT_MUTED };
-            fb.draw_aa_text(wx + 36, ry + 31, &UI_SANS, &sub, sub_col, None);
+            fb.draw_aa_text_clipped(wx + 36, ry + 31, left_w.saturating_sub(24), &UI_SANS, &sub, sub_col, None);
         }
 
         let detail_x = wx + 24 + left_w + 16;
         let detail_w = ww.saturating_sub(24 + left_w + 16 + 24);
         let detail_h = wh.saturating_sub(136);
-        fb.draw_glass_panel(detail_x, list_y, detail_w, detail_h, 12, Color::SURFACE_CARD, Color::BORDER);
+        fb.draw_glass_panel(detail_x, list_y, detail_w, detail_h, 12, Color::SURFACE_ALT, Color::BORDER);
 
         if let Some(prof) = services.profiles.get(self.profile_cursor) {
             let is_active = services.active_profile == Some(self.profile_cursor);
-            fb.draw_aa_text(detail_x + 18, list_y + 12, &UI_HEADING, prof.name, Color::TEXT_PRIMARY, None);
+            let inner_w = detail_w.saturating_sub(36);
+            fb.draw_aa_text_clipped(detail_x + 18, list_y + 12, inner_w, &UI_HEADING, prof.name, Color::TEXT_PRIMARY, None);
+            fb.draw_aa_text_clipped(detail_x + 18, list_y + 42, inner_w, &UI_SANS, prof.description, Color::TEXT_MUTED, None);
 
-            let max_chars = ((detail_w.saturating_sub(36)) / 8).max(32);
-            let desc_fit: String = prof.description.chars().take(max_chars).collect();
-            fb.draw_aa_text(detail_x + 18, list_y + 42, &UI_SANS, &desc_fit, Color::TEXT_MUTED, None);
+            let venv_line = format!("~/.venv/{}  (ephemeral, purged on switch)", prof.venv_name);
+            fb.draw_aa_text_clipped(detail_x + 18, list_y + 72, inner_w, &TERM_MONO, &venv_line, Color::TEXT_PRIMARY, None);
 
-            let venv_line = format!("Virtual Env: ~/.venv/{}   (Auto-purged on switch/deactivate)", prof.venv_name);
-            let venv_fit: String = venv_line.chars().take(max_chars).collect();
-            fb.draw_aa_text(detail_x + 18, list_y + 72, &TERM_MONO, &venv_fit, Color::VIOLET, None);
-
-            let box_w = detail_w.saturating_sub(36);
+            let box_w = inner_w;
+            let box_txt_w = box_w.saturating_sub(24);
             fb.draw_rounded_rect(detail_x + 18, list_y + 102, box_w, 66, 8, Color::SURFACE, Some(Color::BORDER));
-            fb.draw_aa_text(detail_x + 28, list_y + 108, &UI_SANS, "System Tools (Temporary APT & Snapstore):", Color::ACCENT, None);
+            fb.draw_aa_text_clipped(detail_x + 28, list_y + 108, box_txt_w, &UI_SANS, "System Tools (Temporary APT & Snap)", Color::TEXT_MUTED, None);
             let mut tools = String::new();
             for (k, a) in prof.apt_deps.iter().enumerate() {
                 if k > 0 { tools.push_str(", "); }
@@ -2463,13 +2475,11 @@ impl Desktop {
                 tools.push_str(", ");
                 tools.push_str(s);
             }
-            let tools_fit: String = tools.chars().take(max_chars.saturating_sub(4)).collect();
-            fb.draw_aa_text(detail_x + 28, list_y + 136, &TERM_MONO, &tools_fit, Color::TEXT_PRIMARY, None);
+            fb.draw_aa_text_clipped(detail_x + 28, list_y + 136, box_txt_w, &TERM_MONO, &tools, Color::TEXT_PRIMARY, None);
 
             fb.draw_rounded_rect(detail_x + 18, list_y + 178, box_w, 86, 8, Color::SURFACE, Some(Color::BORDER));
-            fb.draw_aa_text(detail_x + 28, list_y + 184, &UI_SANS, "Python .venv Modules (pip packages):", Color::SAGE, None);
+            fb.draw_aa_text_clipped(detail_x + 28, list_y + 184, box_txt_w, &UI_SANS, "Python .venv Modules (pip packages)", Color::TEXT_MUTED, None);
 
-            let mono_max = (box_w.saturating_sub(20) / 9).max(28);
             let mut line1 = String::new();
             let mut line2 = String::new();
             for (k, m) in prof.pip_modules.iter().enumerate() {
@@ -2477,18 +2487,16 @@ impl Desktop {
                 if !target.is_empty() { target.push_str("  |  "); }
                 target.push_str(m);
             }
-            let l1_fit: String = line1.chars().take(mono_max).collect();
-            let l2_fit: String = line2.chars().take(mono_max).collect();
-            fb.draw_aa_text(detail_x + 28, list_y + 212, &TERM_MONO, &l1_fit, Color::TEXT_PRIMARY, None);
-            if !l2_fit.is_empty() {
-                fb.draw_aa_text(detail_x + 28, list_y + 234, &TERM_MONO, &l2_fit, Color::TEXT_MUTED, None);
+            fb.draw_aa_text_clipped(detail_x + 28, list_y + 212, box_txt_w, &TERM_MONO, &line1, Color::TEXT_PRIMARY, None);
+            if !line2.is_empty() {
+                fb.draw_aa_text_clipped(detail_x + 28, list_y + 234, box_txt_w, &TERM_MONO, &line2, Color::TEXT_MUTED, None);
             }
 
             let btn_y = wy + wh - 92;
             let btn_w = (detail_w.saturating_sub(44)) / 2;
 
             let (act_lbl, act_bg, act_fg, act_brd) = if is_active {
-                ("Deactivate & Purge .venv", Color::SURFACE, Color::CORAL, Some(Color::BORDER))
+                ("Deactivate .venv", Color::SURFACE, Color::CORAL, Some(Color::BORDER))
             } else {
                 ("Activate Profile", Color::INK_SOLID, Color::GLASS_TEXT, None)
             };
@@ -2496,14 +2504,14 @@ impl Desktop {
             let aw = UI_SANS.text_width(act_lbl);
             fb.draw_aa_text(detail_x + 16 + (btn_w.saturating_sub(aw)) / 2, btn_y + 5, &UI_SANS, act_lbl, act_fg, None);
 
-            let ide_lbl = "Open VS Code in Terminal";
+            let ide_lbl = "Open in Terminal";
             fb.draw_rounded_rect(detail_x + 28 + btn_w, btn_y, btn_w, 34, 8, Color::SURFACE, Some(Color::BORDER));
             let iw = UI_SANS.text_width(ide_lbl);
             fb.draw_aa_text(detail_x + 28 + btn_w + (btn_w.saturating_sub(iw)) / 2, btn_y + 5, &UI_SANS, ide_lbl, Color::TEXT_PRIMARY, None);
         }
 
         fb.fill_rect(wx + 20, wy + wh - 36, ww - 40, 1, Color::BORDER);
-        fb.draw_aa_text(wx + 28, wy + wh - 26, &UI_SANS, &self.status_msg, Color::TEXT_MUTED, None);
+        fb.draw_aa_text_clipped(wx + 28, wy + wh - 26, ww.saturating_sub(56), &UI_SANS, &self.status_msg, Color::TEXT_MUTED, None);
     }
 
     fn draw_network_tab(&self, fb: &mut Framebuffer, wx: usize, wy: usize, ww: usize, wh: usize, services: &SystemServices) {

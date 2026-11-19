@@ -35,6 +35,9 @@ pub struct SimResult {
 
 /// First-In First-Out (FIFO) Page Replacement
 pub fn simulate_fifo(refs: &[u8], frames: usize) -> usize {
+    if frames == 0 {
+        return refs.len();
+    }
     let mut queue: VecDeque<u8> = VecDeque::new();
     let mut faults = 0usize;
 
@@ -52,6 +55,9 @@ pub fn simulate_fifo(refs: &[u8], frames: usize) -> usize {
 
 /// Least Recently Used (LRU) Page Replacement
 pub fn simulate_lru(refs: &[u8], frames: usize) -> usize {
+    if frames == 0 {
+        return refs.len();
+    }
     let mut stack: VecDeque<u8> = VecDeque::new();
     let mut faults = 0usize;
 
@@ -74,6 +80,9 @@ pub fn simulate_lru(refs: &[u8], frames: usize) -> usize {
 
 /// Belady's Optimal (OPT) Page Replacement
 pub fn simulate_opt(refs: &[u8], frames: usize) -> usize {
+    if frames == 0 {
+        return refs.len();
+    }
     let mut loaded: VecDeque<u8> = VecDeque::new();
     let mut faults = 0usize;
 

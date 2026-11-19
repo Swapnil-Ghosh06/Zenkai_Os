@@ -297,7 +297,7 @@ impl OsLabState {
                 return true;
             }
         } else {
-            let opts = [4usize, 8, 12, 16];
+            let opts = [4usize, 8, 16, 32];
             for (i, &f) in opts.iter().enumerate() {
                 let bx = wx + ww - 236 + i * 54;
                 if mouse.in_rect(bx, wy + 50, 48, 30) {
@@ -433,13 +433,14 @@ impl OsLabState {
     }
 
     fn draw_r19_visualizer(&self, fb: &mut Framebuffer, wx: usize, wy: usize, ww: usize, wh: usize) {
-        // Frame count selector buttons on top right
-        for (i, &f) in [4usize, 8, 12, 16].iter().enumerate() {
+        // Frame count selector buttons on top right (4F, 8F, 16F, 32F matching CA-2/CA-4)
+        for (i, &f) in [4usize, 8, 16, 32].iter().enumerate() {
             let bx = wx + ww - 236 + i * 54;
             let active = self.r19_frames == f;
-            let bg = if active { Color::INK_SOLID } else { Color::SURFACE_CARD };
+            let bg = if active { Color::INK_SOLID } else { Color::SURFACE_ALT };
             let fg = if active { Color::GLASS_TEXT } else { Color::TEXT_MUTED };
-            fb.draw_rounded_rect(bx, wy + 50, 48, 30, 7, bg, Some(Color::BORDER));
+            let brd = if active { None } else { Some(Color::BORDER) };
+            fb.draw_rounded_rect(bx, wy + 50, 48, 30, 7, bg, brd);
             let lbl = format!("{}F", f);
             let lw = UI_SANS.text_width(&lbl);
             fb.draw_aa_text(bx + (48usize.saturating_sub(lw)) / 2, wy + 53, &UI_SANS, &lbl, fg, None);
@@ -447,12 +448,10 @@ impl OsLabState {
 
         // Legend
         let legend = format!(
-            "Page Faults across 500 AI/ML References (Frames = {})  |  Red: FIFO   Blue: LRU   Green: OPT",
-            self.r19_frames
+            "R19 Page Faults ({} AI/ML refs, {} frames)  |  Red: FIFO   Blue: LRU   Green: OPT",
+            REF_LENGTH, self.r19_frames
         );
-        let max_leg = ((ww - 56) / 8).max(32);
-        let leg_fit: String = legend.chars().take(max_leg).collect();
-        fb.draw_aa_text(wx + 28, wy + 90, &UI_SANS, &leg_fit, Color::TEXT_MUTED, None);
+        fb.draw_aa_text_clipped(wx + 28, wy + 90, ww.saturating_sub(56), &UI_SANS, &legend, Color::TEXT_MUTED, None);
 
         // 4 Workload Bar Cards
         let start_y = wy + 120;
@@ -486,12 +485,13 @@ impl OsLabState {
         }
 
         fb.fill_rect(wx + 20, wy + wh - 36, ww - 40, 1, Color::BORDER);
-        fb.draw_aa_text(
+        fb.draw_aa_text_clipped(
             wx + 28,
             wy + wh - 26,
+            ww.saturating_sub(56),
             &UI_SANS,
-            "R19 Research Visualizer (CA-2 / CA-6)  |  Click 4F / 8F / 12F / 16F to compare live",
-            Color::VIOLET,
+            "R19 Page Replacement Visualizer (CA-2 / CA-4 / CA-6)  |  Select 4F / 8F / 16F / 32F",
+            Color::TEXT_MUTED,
             None,
         );
     }

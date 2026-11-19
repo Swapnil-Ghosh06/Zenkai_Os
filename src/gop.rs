@@ -8,6 +8,9 @@ extern crate alloc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use uefi::boot::{OpenProtocolAttributes, OpenProtocolParams};
+use uefi::proto::console::gop::{BltOp, BltPixel, BltRegion, GraphicsOutput};
+
 use crate::font_aa::{AaFace, WORDMARK_COV, WORDMARK_H, WORDMARK_W};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -78,6 +81,7 @@ pub struct Framebuffer {
     pub height: usize,
     pub stride: usize,
     pub is_bgr: bool,
+    gop_handle: Option<uefi::Handle>,
     back: Vec<u32>,
     wallpaper: Vec<u32>,
     buffered: bool,
@@ -87,7 +91,14 @@ unsafe impl Send for Framebuffer {}
 unsafe impl Sync for Framebuffer {}
 
 impl Framebuffer {
-    pub unsafe fn from_raw(base: *mut u32, width: usize, height: usize, stride: usize, is_bgr: bool) -> Self {
+    pub unsafe fn from_raw(
+        base: *mut u32,
+        width: usize,
+        height: usize,
+        stride: usize,
+        is_bgr: bool,
+        gop_handle: Option<uefi::Handle>,
+    ) -> Self {
         let pixel_count = width.saturating_mul(height);
         Self {
             base,
@@ -95,6 +106,7 @@ impl Framebuffer {
             height,
             stride,
             is_bgr,
+            gop_handle,
             back: vec![0u32; pixel_count],
             wallpaper: Vec::new(),
             buffered: false,
@@ -112,13 +124,45 @@ impl Framebuffer {
         self.buffered
     }
 
-    /// Blits the entire completed RAM backbuffer to UEFI GOP VRAM row-by-row using MMIO-safe writes.
+    /// Blits the entire completed RAM backbuffer to UEFI GOP using `GraphicsOutput::blt`
+    /// (firmware-native, pitch-safe on VirtualBox ARM64/VMSVGA) with row-by-row MMIO fallback.
     pub fn present(&mut self) {
         self.buffered = false;
         let w = self.width;
         let h = self.height;
         if w == 0 || h == 0 || self.back.len() < w * h {
             return;
+        }
+        if self.is_bgr {
+            if let Some(handle) = self.gop_handle {
+                let gop_opt = unsafe {
+                    uefi::boot::open_protocol::<GraphicsOutput>(
+                        OpenProtocolParams {
+                            handle,
+                            agent: uefi::boot::image_handle(),
+                            controller: None,
+                        },
+                        OpenProtocolAttributes::GetProtocol,
+                    )
+                    .ok()
+                };
+                if let Some(mut gop) = gop_opt {
+                    let blt_slice = unsafe {
+                        core::slice::from_raw_parts(self.back.as_ptr() as *const BltPixel, w * h)
+                    };
+                    if gop
+                        .blt(BltOp::BufferToVideo {
+                            buffer: blt_slice,
+                            src: BltRegion::Full,
+                            dest: (0, 0),
+                            dims: (w, h),
+                        })
+                        .is_ok()
+                    {
+                        return;
+                    }
+                }
+            }
         }
         unsafe {
             for y in 0..h {
@@ -142,7 +186,42 @@ impl Framebuffer {
             return;
         }
         let copy_w = x1 - x0;
+        let copy_h = y1 - y0;
         let w = self.width;
+        if self.is_bgr {
+            if let Some(handle) = self.gop_handle {
+                let gop_opt = unsafe {
+                    uefi::boot::open_protocol::<GraphicsOutput>(
+                        OpenProtocolParams {
+                            handle,
+                            agent: uefi::boot::image_handle(),
+                            controller: None,
+                        },
+                        OpenProtocolAttributes::GetProtocol,
+                    )
+                    .ok()
+                };
+                if let Some(mut gop) = gop_opt {
+                    let blt_slice = unsafe {
+                        core::slice::from_raw_parts(self.back.as_ptr() as *const BltPixel, w * self.height)
+                    };
+                    if gop
+                        .blt(BltOp::BufferToVideo {
+                            buffer: blt_slice,
+                            src: BltRegion::SubRectangle {
+                                coords: (x0, y0),
+                                px_stride: w,
+                            },
+                            dest: (x0, y0),
+                            dims: (copy_w, copy_h),
+                        })
+                        .is_ok()
+                    {
+                        return;
+                    }
+                }
+            }
+        }
         unsafe {
             for cy in y0..y1 {
                 let src = self.back.as_ptr().add(cy * w + x0);
@@ -668,6 +747,44 @@ impl Framebuffer {
             }
             cur_x += self.draw_aa_char(cur_x, cur_y, face, ch, fg, bg);
         }
+    }
+
+    /// Renders a single-line anti-aliased string strictly clipped to `max_w` pixels,
+    /// appending `..` if truncated so text never overflows any card or window border.
+    pub fn draw_aa_text_clipped(
+        &mut self,
+        x: usize,
+        y: usize,
+        max_w: usize,
+        face: &AaFace,
+        text: &str,
+        fg: Color,
+        bg: Option<Color>,
+    ) {
+        if max_w < 12 {
+            return;
+        }
+        let full_w = face.text_width(text);
+        if full_w <= max_w {
+            self.draw_aa_text(x, y, face, text, fg, bg);
+            return;
+        }
+        let ell_w = face.text_width("..");
+        let limit = max_w.saturating_sub(ell_w);
+        let mut cur_x = x;
+        let mut used = 0usize;
+        for ch in text.chars() {
+            if ch == '\n' {
+                break;
+            }
+            let adv = face.glyph(ch).advance as usize;
+            if used + adv > limit {
+                break;
+            }
+            cur_x += self.draw_aa_char(cur_x, y, face, ch, fg, bg);
+            used += adv;
+        }
+        self.draw_aa_text(cur_x, y, face, "..", fg, bg);
     }
 
     /// Renders the crisp anti-aliased "Zenkai" wordmark centered horizontally at `top_y`.

@@ -17,6 +17,7 @@ use crate::gop::Color;
 use crate::hw::HardwareInfo;
 use crate::memory::FrameAllocator;
 use crate::pkg::SystemServices;
+use crate::py_interp::PyEnv;
 use crate::r19::run_r19_full_benchmark;
 use crate::sched::Scheduler;
 use crate::sync::run_concurrency_stress_test;
@@ -28,6 +29,7 @@ pub struct Shell {
     pub frame_alloc: FrameAllocator,
     pub heap_alloc: FreeListAllocator,
     pub scheduler: Scheduler,
+    pub py: PyEnv,
     pub start_tsc: u64,
 }
 
@@ -45,11 +47,16 @@ impl Shell {
             frame_alloc: FrameAllocator::new(),
             heap_alloc: heap,
             scheduler: sched,
+            py: PyEnv::new(),
             start_tsc: read_tsc(),
         }
     }
 
     pub fn print_prompt(&self, services: &SystemServices) {
+        if self.py.repl_active {
+            self.py.print_repl_prompt();
+            return;
+        }
         let mut con = crate::console::GLOBAL_CONSOLE.lock();
         if let Some(venv) = services.active_venv_label() {
             con.fg = Color::VIOLET;
@@ -85,6 +92,13 @@ impl Shell {
     }
 
     pub fn dispatch(&mut self, line: &str, services: &mut SystemServices, hw: &HardwareInfo) -> bool {
+        if self.py.repl_active {
+            if !self.py.handle_repl_line(line, services) {
+                kinfo!("PYTHON", "Exited interactive Python REPL.");
+            }
+            return true;
+        }
+
         let trimmed = line.trim();
         if trimmed.is_empty() {
             return true;
@@ -178,7 +192,14 @@ impl Shell {
                 return false;
             }
             unknown => {
-                kwarn!("SHELL", "Unknown command: '{}'. Type 'help' for commands.", unknown);
+                let py_ready = services.is_apt_installed("python3-ml") || services.active_profile.is_some();
+                if py_ready && PyEnv::looks_like_python(trimmed) {
+                    if let Err(e) = self.py.exec_line_interactive(trimmed, services) {
+                        kerror!("PYTHON", "{}", e);
+                    }
+                } else {
+                    kwarn!("SHELL", "Unknown command: '{}'. Type 'help' for commands.", unknown);
+                }
             }
         }
         true
@@ -590,7 +611,7 @@ impl Shell {
         }
     }
 
-    fn cmd_profile(&self, sub: &str, arg: &str, services: &mut SystemServices) {
+    fn cmd_profile(&mut self, sub: &str, arg: &str, services: &mut SystemServices) {
         match sub {
             "" | "list" => {
                 kprintln!();
@@ -629,9 +650,11 @@ impl Shell {
                 };
                 if let Some(idx) = found_idx {
                     if let Some((prev_name, purged)) = services.deactivate_profile() {
+                        self.py.reset();
                         kwarn!("VENV", "Switched out of '{}': purged {} temporary pkgs.", prev_name, purged);
                     }
                     if let Some((name, added_apt, added_snap)) = services.activate_profile(idx) {
+                        self.py.reset();
                         let p = services.profiles[idx].clone();
                         kinfo!("VENV", "Creating ephemeral virtual env ~/.venv/{}...", p.venv_name);
                         sleep_ms(140);
@@ -648,6 +671,7 @@ impl Shell {
                 }
             }
             "deactivate" | "purge" | "off" => {
+                self.py.reset();
                 if let Some((name, purged)) = services.deactivate_profile() {
                     kok!("VENV", "Deactivated '{}': purged {} temp packages & deleted .venv.", name, purged);
                 } else {
@@ -694,9 +718,9 @@ impl Shell {
         kprintln!();
     }
 
-    fn cmd_python(&self, raw: &str, arg1: &str, arg2: &str, services: &SystemServices) {
+    fn cmd_python(&mut self, raw: &str, arg1: &str, arg2: &str, services: &SystemServices) {
         if !services.is_apt_installed("python3-ml") && services.active_profile.is_none() {
-            kwarn!("PYTHON", "Package 'python3-ml' not installed. Run: apt install python3-ml");
+            kwarn!("PYTHON", "Package 'python3-ml' not installed. Run: apt install python3-ml or activate a .venv profile");
             return;
         }
         let venv = services.active_venv_label().unwrap_or("global");
@@ -711,21 +735,21 @@ impl Shell {
         if arg1 == "-c" {
             let code_idx = raw.find("-c").map(|i| i + 2).unwrap_or(raw.len());
             let expr = raw[code_idx..].trim().trim_matches('"').trim_matches('\'');
-            kinfo!("PYTHON", "(.venv:{}) Evaluating: {}", venv, expr);
-            kok!("PYTHON", ">>> {}", expr);
+            if let Err(e) = self.py.exec_script(expr, services) {
+                kerror!("PYTHON", "{}", e);
+            }
             return;
         }
-        kprintln!();
-        kinfo!("PYTHON", "Python 3.11.4 ML Runtime [env: .venv:{}]", venv);
-        if let Some(prof) = services.active_profile_info() {
-            kinfo!("PYTHON", "Loaded modules: {:?}", prof.pip_modules);
+        if !arg1.is_empty() && !arg1.starts_with('-') {
+            kinfo!("PYTHON", "Running {} in (.venv:{})...", arg1, venv);
+            let sample = "import torch, numpy as np\nfrom zenkai.r19 import PageSimulator\nbatch = torch.randn(8)\nsim = PageSimulator('R19-OPT', frames=12)\nprint('Tensor mean:', batch.mean(), '| R19 OPT rate:', sim)";
+            if let Err(e) = self.py.exec_script(sample, services) {
+                kerror!("PYTHON", "{}", e);
+            }
+            return;
         }
-        let t0 = read_tsc();
-        sleep_ms(70);
-        let dt = read_tsc().saturating_sub(t0);
-        kok!("PYTHON", ">>> import numpy as np; np.dot([1,2,3],[4,5,6]) => 32 ({} cyc)", dt);
-        kprintln!("  Tip: Try 'code train_ai.py', 'pip list', or 'pytorch'.");
-        kprintln!();
+        self.py.repl_active = true;
+        self.py.print_repl_banner(services);
     }
 
     fn cmd_pip(&self, sub: &str, pkg: &str, services: &mut SystemServices) {

@@ -318,13 +318,20 @@ impl MouseDriver {
         for abs in &mut self.abss {
             if let Some(m) = abs.mode_info() {
                 while let Some(st) = abs.read_state() {
-                    if m.absolute_max_x > m.absolute_min_x && m.absolute_max_y > m.absolute_min_y {
-                        let span_x = (m.absolute_max_x - m.absolute_min_x).max(1);
-                        let span_y = (m.absolute_max_y - m.absolute_min_y).max(1);
-                        let cx = st.current_x.clamp(m.absolute_min_x, m.absolute_max_x) - m.absolute_min_x;
-                        let cy = st.current_y.clamp(m.absolute_min_y, m.absolute_max_y) - m.absolute_min_y;
-                        self.x = ((cx as u128 * (self.max_w.saturating_sub(1)) as u128) / span_x as u128) as usize;
-                        self.y = ((cy as u128 * (self.max_h.saturating_sub(1)) as u128) / span_y as u128) as usize;
+                    let min_x = m.absolute_min_x;
+                    let max_x = if m.absolute_max_x > min_x { m.absolute_max_x } else { 65535 };
+                    let min_y = m.absolute_min_y;
+                    let max_y = if m.absolute_max_y > min_y { m.absolute_max_y } else { 65535 };
+                    let span_x = (max_x - min_x).max(1);
+                    let span_y = (max_y - min_y).max(1);
+                    let cx = st.current_x.clamp(min_x, max_x) - min_x;
+                    let cy = st.current_y.clamp(min_y, max_y) - min_y;
+                    let nx = ((cx as u128 * (self.max_w.saturating_sub(1)) as u128) / span_x as u128) as usize;
+                    let ny = ((cy as u128 * (self.max_h.saturating_sub(1)) as u128) / span_y as u128) as usize;
+                    // Ignore initial (0,0) dummy reports unless user actually clicked
+                    if nx != 0 || ny != 0 || (st.active_buttons & 1) != 0 {
+                        self.x = nx;
+                        self.y = ny;
                     }
                     let now_down = (st.active_buttons & 1) != 0;
                     if now_down && !self.abs_left {
@@ -429,6 +436,10 @@ impl MouseDriver {
         if !self.saved {
             return;
         }
+        let was_buf = fb.is_buffered();
+        if !was_buf {
+            fb.begin_frame();
+        }
         for r in 0..CUR_H {
             for c in 0..CUR_W {
                 let px = self.drawn_x + c;
@@ -438,10 +449,17 @@ impl MouseDriver {
                 }
             }
         }
+        if !was_buf {
+            fb.present_rect(self.drawn_x, self.drawn_y, CUR_W, CUR_H);
+        }
         self.saved = false;
     }
 
     pub fn draw(&mut self, fb: &mut Framebuffer) {
+        let was_buf = fb.is_buffered();
+        if !was_buf {
+            fb.begin_frame();
+        }
         self.drawn_x = self.x;
         self.drawn_y = self.y;
         for r in 0..CUR_H {
@@ -459,6 +477,9 @@ impl MouseDriver {
                     fb.set_pixel(px, py, col);
                 }
             }
+        }
+        if !was_buf {
+            fb.present_rect(self.drawn_x, self.drawn_y, CUR_W, CUR_H);
         }
         self.saved = true;
     }

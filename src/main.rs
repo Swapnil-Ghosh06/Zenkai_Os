@@ -24,6 +24,7 @@ pub mod mouse;
 pub mod notes;
 pub mod os_lab;
 pub mod pkg;
+pub mod py_interp;
 pub mod r19;
 pub mod readyq;
 pub mod sched;
@@ -132,10 +133,15 @@ fn main() -> Status {
             uefi::proto::console::gop::PixelFormat::Rgb
                 | uefi::proto::console::gop::PixelFormat::Bgr
         );
-        // Only switch GOP mode when the firmware booted in a small mode (< 1024x720).
-        // Keeping the native mode (e.g. 1024x768 or 1280x800) avoids VirtualBox VMSVGA
-        // scanout-pitch desync / horizontal shearing after set_mode().
-        if !cur_fmt_ok || cw < 1024 || ch < 720 {
+        // On aarch64 (e.g. Apple Silicon VirtualBox armv8virtual + VMSVGA), NEVER call
+        // gop.set_mode() if the firmware already initialized a valid >= 640x480 graphics mode,
+        // because VMSVGA can keep the boot scanout pitch and shear the framebuffer.
+        #[cfg(target_arch = "aarch64")]
+        let should_switch_mode = !cur_fmt_ok || cw < 640 || ch < 480;
+        #[cfg(not(target_arch = "aarch64"))]
+        let should_switch_mode = !cur_fmt_ok || cw < 1024 || ch < 720;
+
+        if should_switch_mode {
             let best_mode = gop
                 .modes()
                 .filter(|m| {
@@ -173,7 +179,7 @@ fn main() -> Status {
         let mut fb = gop.frame_buffer();
         let base_ptr = fb.as_mut_ptr() as *mut u32;
 
-        let framebuffer = unsafe { Framebuffer::from_raw(base_ptr, width, height, stride, is_bgr) };
+        let framebuffer = unsafe { Framebuffer::from_raw(base_ptr, width, height, stride, is_bgr, Some(handle)) };
         Ok(framebuffer)
     })();
 

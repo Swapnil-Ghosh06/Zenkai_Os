@@ -13,13 +13,15 @@ pub fn default_gateway_ip() -> &'static str {
 }
 
 pub fn default_base_ping_tenths_ms() -> u32 {
-    118
+    183
 }
 
 pub fn default_scanned_networks() -> Vec<WifiNetwork> {
     let mut nets = Vec::new();
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 74, connected: true });
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-C1-F3"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 26, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("Airtel_Bhavesh"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 22, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 64, connected: true });
+    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3 (2.4G)"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 88, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Viraj"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 40, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Galaxy M36 5G E41D"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 30, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-C1-F9"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 24, connected: false });
     nets
 }
