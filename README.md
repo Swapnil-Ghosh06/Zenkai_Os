@@ -83,9 +83,9 @@ $$\mathbf{Think} \longrightarrow \mathbf{Measure} \longrightarrow \mathbf{Debug}
 | **CA-1** | Systems Thinking | [CA1_Systems_Thinking_R19_Swapnil_Ghosh.pdf](./CA1_Systems_Thinking_R19_Swapnil_Ghosh.pdf) | Formulated trade-offs between monolithic vs. microkernel IPC overhead and memory isolation. |
 | **CA-2** | Performance Investigation | [CA2_Performance_Investigation.pdf](./CA2_Performance_Investigation.pdf) | Measured context-switch latency scaling under concurrency; incorporated into Zenkai's Round-Robin scheduler. |
 | **CA-3** | Design & Debugging | [CA3_Design_and_Debugging.pdf](./CA3_Design_and_Debugging.pdf) | Diagnosed and fixed an LRU cache-hit recency bug where resident hits failed to update recency metadata. |
-| **CA-4** | Research Mini-Project | [R19_SWAP_v4.docx](./R19_SWAP_v4.docx) | Authored research paper: *"R19 — Page Replacement Policies for AI/ML Memory Access Patterns"*. |
+| **CA-4** | Research Mini-Project | [CA4_Research_Mini_Project_R19_Swapnil_Ghosh.pdf](./CA4_Research_Mini_Project_R19_Swapnil_Ghosh.pdf) ([R19_SWAP_v4.docx](./R19_SWAP_v4.docx)) | Authored research paper: *"R19 — Page Replacement Policies for AI/ML Memory Access Patterns"*. |
 | **CA-5** | Linux Systems Engineering | [CA5_Linux_Systems_Engineering.pdf](./CA5_Linux_Systems_Engineering.pdf) | Investigated demand paging latency (cold faults vs. warm hits) across 32 MB address spaces. |
-| **CA-6** | Rust Micro-OS Engineering | [src/](./src/) | Engineered full 10-layer educational microkernel & desktop OS in pure `no_std` Rust. |
+| **CA-6** | Rust Micro-OS Engineering | [CA6_Rust_Micro_OS_R19_Swapnil_Ghosh.pdf](./CA6_Rust_Micro_OS_R19_Swapnil_Ghosh.pdf) · [src/](./src/) | Engineered full 10-layer educational microkernel & desktop OS in pure `no_std` Rust. |
 | **Defense** | Viva Voce Presentation | [Zenkai_OS_Continuous_Assessment_Defense.pptx](./Zenkai_OS_Continuous_Assessment_Defense.pptx) | 10-slide presentation deck for the faculty defense and evaluation. |
 
 ---
@@ -260,7 +260,13 @@ Or flash `zenkai_os_live.iso` with **Rufus** on Windows (**GPT** + **UEFI non-CS
 ├── test_runner.py                        # 12-Check Automated Verification Suite
 ├── run.sh / zenkai / build_iso.sh        # QEMU runners & ISO/OVA packagers
 ├── zenkai_os_live.iso / .ova / .vdi      # Bootable images & VirtualBox appliance
-└── R19_SWAP_v4.docx & CA*.pdf            # Coursework & R19 Research deliverables
+├── CA1_Systems_Thinking_R19_Swapnil_Ghosh.pdf
+├── CA2_Performance_Investigation.pdf
+├── CA3_Design_and_Debugging.pdf
+├── CA4_Research_Mini_Project_R19_Swapnil_Ghosh.pdf
+├── CA5_Linux_Systems_Engineering.pdf
+├── CA6_Rust_Micro_OS_R19_Swapnil_Ghosh.pdf
+└── R19_SWAP_v4.docx & Zenkai_OS_Continuous_Assessment_Defense.pptx
 ```
 
 ---
