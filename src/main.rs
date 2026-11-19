@@ -125,33 +125,45 @@ fn main() -> Status {
     let gop_init_result = (|| -> uefi::Result<Framebuffer> {
         let handle = uefi::boot::get_handle_for_protocol::<GraphicsOutput>()?;
         let mut gop = uefi::boot::open_protocol_exclusive::<GraphicsOutput>(handle)?;
-        let best_mode = gop
-            .modes()
-            .filter(|m| {
-                let info = m.info();
-                let (mw, mh) = info.resolution();
-                let fmt_ok = matches!(
-                    info.pixel_format(),
-                    uefi::proto::console::gop::PixelFormat::Rgb
-                        | uefi::proto::console::gop::PixelFormat::Bgr
-                );
-                fmt_ok && mw >= 1024 && mh >= 720 && mw <= 1920 && mh <= 1200
-            })
-            .min_by_key(|m| {
-                let (mw, mh) = m.info().resolution();
-                if (mw, mh) == (1280, 800) {
-                    0usize
-                } else if (mw, mh) == (1280, 720) {
-                    1
-                } else if (mw, mh) == (1024, 768) {
-                    2
-                } else {
-                    3 + mw.abs_diff(1280) + mh.abs_diff(800)
+        let cur = gop.current_mode_info();
+        let (cw, ch) = cur.resolution();
+        let cur_fmt_ok = matches!(
+            cur.pixel_format(),
+            uefi::proto::console::gop::PixelFormat::Rgb
+                | uefi::proto::console::gop::PixelFormat::Bgr
+        );
+        // Only switch GOP mode when the firmware booted in a small mode (< 1024x720).
+        // Keeping the native mode (e.g. 1024x768 or 1280x800) avoids VirtualBox VMSVGA
+        // scanout-pitch desync / horizontal shearing after set_mode().
+        if !cur_fmt_ok || cw < 1024 || ch < 720 {
+            let best_mode = gop
+                .modes()
+                .filter(|m| {
+                    let info = m.info();
+                    let (mw, mh) = info.resolution();
+                    let fmt_ok = matches!(
+                        info.pixel_format(),
+                        uefi::proto::console::gop::PixelFormat::Rgb
+                            | uefi::proto::console::gop::PixelFormat::Bgr
+                    );
+                    fmt_ok && mw >= 1024 && mh >= 720 && mw <= 1920 && mh <= 1200
+                })
+                .min_by_key(|m| {
+                    let (mw, mh) = m.info().resolution();
+                    if (mw, mh) == (1280, 800) {
+                        0usize
+                    } else if (mw, mh) == (1280, 720) {
+                        1
+                    } else if (mw, mh) == (1024, 768) {
+                        2
+                    } else {
+                        3 + mw.abs_diff(1280) + mh.abs_diff(800)
+                    }
+                });
+            if let Some(m) = best_mode {
+                if gop.current_mode_info().resolution() != m.info().resolution() {
+                    let _ = gop.set_mode(&m);
                 }
-            });
-        if let Some(m) = best_mode {
-            if gop.current_mode_info().resolution() != m.info().resolution() {
-                let _ = gop.set_mode(&m);
             }
         }
         let mode = gop.current_mode_info();

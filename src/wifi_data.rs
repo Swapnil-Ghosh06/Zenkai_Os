@@ -13,15 +13,13 @@ pub fn default_gateway_ip() -> &'static str {
 }
 
 pub fn default_base_ping_tenths_ms() -> u32 {
-    128
+    118
 }
 
 pub fn default_scanned_networks() -> Vec<WifiNetwork> {
     let mut nets = Vec::new();
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 68, connected: true });
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3 (2.4G)"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 96, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("Mojo-Jan-B-F4"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 62, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-C1-F5"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 44, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-C1-F9"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 40, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 74, connected: true });
+    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-C1-F3"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 26, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Airtel_Bhavesh"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 22, connected: false });
     nets
 }

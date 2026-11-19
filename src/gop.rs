@@ -112,7 +112,7 @@ impl Framebuffer {
         self.buffered
     }
 
-    /// Blits the entire completed RAM backbuffer to UEFI GOP VRAM in one sequential pass.
+    /// Blits the entire completed RAM backbuffer to UEFI GOP VRAM row-by-row using MMIO-safe writes.
     pub fn present(&mut self) {
         self.buffered = false;
         let w = self.width;
@@ -121,13 +121,11 @@ impl Framebuffer {
             return;
         }
         unsafe {
-            if self.stride == w {
-                core::ptr::copy_nonoverlapping(self.back.as_ptr(), self.base, w * h);
-            } else {
-                for y in 0..h {
-                    let src = self.back.as_ptr().add(y * w);
-                    let dst = self.base.add(y * self.stride);
-                    core::ptr::copy_nonoverlapping(src, dst, w);
+            for y in 0..h {
+                let src = self.back.as_ptr().add(y * w);
+                let dst = self.base.add(y * self.stride);
+                for x in 0..w {
+                    dst.add(x).write_volatile(*src.add(x));
                 }
             }
         }
@@ -149,7 +147,9 @@ impl Framebuffer {
             for cy in y0..y1 {
                 let src = self.back.as_ptr().add(cy * w + x0);
                 let dst = self.base.add(cy * self.stride + x0);
-                core::ptr::copy_nonoverlapping(src, dst, copy_w);
+                for cx in 0..copy_w {
+                    dst.add(cx).write_volatile(*src.add(cx));
+                }
             }
         }
     }
@@ -258,7 +258,9 @@ impl Framebuffer {
                 unsafe {
                     let src = self.back.as_ptr().add(back_row);
                     let dst = self.base.add(cy * stride + x);
-                    core::ptr::copy_nonoverlapping(src, dst, count);
+                    for i in 0..count {
+                        dst.add(i).write_volatile(*src.add(i));
+                    }
                 }
             }
         }
@@ -547,9 +549,10 @@ impl Framebuffer {
             self.back[row_start..row_start + count].fill(packed);
             if !buffered {
                 unsafe {
-                    let src = self.back.as_ptr().add(row_start);
                     let dst = self.base.add(cy * stride + x);
-                    core::ptr::copy_nonoverlapping(src, dst, count);
+                    for i in 0..count {
+                        dst.add(i).write_volatile(packed);
+                    }
                 }
             }
         }
