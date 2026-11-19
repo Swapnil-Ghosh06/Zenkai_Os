@@ -13,18 +13,20 @@ pub fn default_gateway_ip() -> &'static str {
 }
 
 pub fn default_base_ping_tenths_ms() -> u32 {
-    152
+    219
 }
 
 pub fn default_scanned_networks() -> Vec<WifiNetwork> {
     let mut nets = Vec::new();
     nets.push(WifiNetwork { ssid: String::from("Jain_Student"), band: String::from("5 GHz"), security: String::from("Open"), signal_pct: 99, connected: true });
-    nets.push(WifiNetwork { ssid: String::from("Jain_Guest"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("Jain_Student (2.4G)"), band: String::from("2.4 GHz"), security: String::from("Open"), signal_pct: 99, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("Jain_Guest (5G)"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
     nets.push(WifiNetwork { ssid: String::from("Jain_Employee"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Guest"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Guest (2.4G)"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
     nets.push(WifiNetwork { ssid: String::from("Jain_Employee (5G)"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Student (2.4G)"), band: String::from("2.4 GHz"), security: String::from("Open"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Galaxy F17 5G 07D5"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Dracxx"), band: String::from("2.4 GHz"), security: String::from("WPA3/WPA2-PSK"), signal_pct: 68, connected: false });
     nets.push(WifiNetwork { ssid: String::from("Jain_Hackathon"), band: String::from("5 GHz"), security: String::from("WPA3/WPA2-PSK"), signal_pct: 38, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("Recover.Me-3809E0"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 20, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Recover.Me-3809E0"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 24, connected: false });
     nets
 }

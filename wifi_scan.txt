@@ -1,10 +1,12 @@
 # IP|172.20.217.17/24
-# GW|172.20.192.1|152
+# GW|172.20.192.1|219
 Jain_Student|5 GHz|Open|99|1
-Jain_Guest|2.4 GHz|WPA2-PSK|99|0
-Jain_Student (2.4G)|2.4 GHz|Open|99|0
-Jain_Guest (5G)|5 GHz|WPA2-PSK|99|0
 Jain_Employee|2.4 GHz|WPA2-PSK|99|0
+Jain_Guest|5 GHz|WPA2-PSK|99|0
+Jain_Guest (2.4G)|2.4 GHz|WPA2-PSK|99|0
 Jain_Employee (5G)|5 GHz|WPA2-PSK|99|0
+Jain_Student (2.4G)|2.4 GHz|Open|99|0
+Galaxy F17 5G 07D5|2.4 GHz|WPA2-PSK|99|0
+Dracxx|2.4 GHz|WPA3/WPA2-PSK|68|0
 Jain_Hackathon|5 GHz|WPA3/WPA2-PSK|38|0
-Recover.Me-3809E0|5 GHz|WPA2-PSK|20|0
+Recover.Me-3809E0|5 GHz|WPA2-PSK|24|0

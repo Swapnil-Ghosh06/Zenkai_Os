@@ -284,6 +284,10 @@ impl Console {
         let fg = self.fg;
 
         if let Some(fb) = &mut self.fb {
+            let was_buffered = fb.is_buffered();
+            if !was_buffered {
+                fb.begin_frame();
+            }
             fb.fill_rect(vp_x, vp_y, vp_w, vp_h, bg);
 
             let mut cy = vp_y;
@@ -315,6 +319,9 @@ impl Console {
                 let py = vp_y + 2;
                 fb.draw_rounded_rect(px, py, pw, 22, 6, Color::SURFACE_CARD, Some(Color::AMBER));
                 fb.draw_aa_text(px + 9, py, &UI_SANS, &pill, Color::AMBER, None);
+            }
+            if !was_buffered {
+                fb.present_rect(vp_x, vp_y, vp_w, vp_h);
             }
         }
     }

@@ -114,8 +114,10 @@ pub fn run_visual_boot_sequence(fb: &mut Framebuffer, hw: &mut HardwareInfo) -> 
     loop {
         if needs_redraw {
             mouse.hide(fb);
+            fb.begin_frame();
             draw_boot_menu(fb, selected, hw.debug_logging, last_shown_sec, wm_y, card_x, card_y);
             mouse.draw(fb);
+            fb.present();
             needs_redraw = false;
         }
 

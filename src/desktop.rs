@@ -416,12 +416,12 @@ impl Desktop {
                         if let Some(cmd) = self.notes.handle_key(key) {
                             self.run_terminal_command(cmd, shell, services, hw);
                         } else {
-                            self.needs_full_redraw = true;
+                            self.render_active_window_only(services, hw, &mut mouse);
                         }
                     }
                 }
             } else {
-                sleep_ms(12);
+                sleep_ms(4);
             }
         }
     }
@@ -1907,6 +1907,7 @@ impl Desktop {
         let mut con = GLOBAL_CONSOLE.lock();
         if let Some(fb) = &mut con.fb {
             mouse.hide(fb);
+            fb.begin_frame();
             let w = fb.width;
             let h = fb.height;
             self.draw_window_contents(fb, services, hw);
@@ -1917,6 +1918,7 @@ impl Desktop {
                 self.draw_start_menu(fb, h, services);
             }
             mouse.draw(fb);
+            fb.present();
         }
     }
 
@@ -1924,10 +1926,11 @@ impl Desktop {
         let mut con = GLOBAL_CONSOLE.lock();
         if let Some(fb) = &mut con.fb {
             mouse.hide(fb);
+            fb.begin_frame();
             let w = fb.width;
             let h = fb.height;
 
-            // 1. Atmospheric Cerulean Sky & Volumetric Cumulus Clouds Wallpaper
+            // 1. Cached Atmospheric Cerulean Sky & Volumetric Cumulus Clouds (~0.3ms RAM copy)
             fb.draw_sky_clouds_wallpaper();
 
             // 2. Translucent Top Menu Bar
@@ -1986,6 +1989,7 @@ impl Desktop {
         }
         if let Some(fb) = &mut con.fb {
             mouse.draw(fb);
+            fb.present();
         }
     }
 
