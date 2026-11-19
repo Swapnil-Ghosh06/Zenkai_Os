@@ -17,25 +17,39 @@ impl Color {
         Self { r, g, b }
     }
 
-    // macOS / Glass Dark Palette (Frosted Dark, Soft Indigo & Violet)
-    pub const BG_TOP: Self = Self::new(11, 14, 26);         // #0B0E1A Deep Space Indigo
-    pub const BG_BOTTOM: Self = Self::new(24, 20, 44);      // #18142C Soft Twilight Violet
-    pub const SURFACE: Self = Self::new(22, 25, 38);        // #161926 Frosted Window Body
-    pub const SURFACE_ALT: Self = Self::new(32, 36, 54);    // #202436 Frosted Titlebar / Dock
-    pub const SURFACE_CARD: Self = Self::new(36, 41, 62);   // #24293E Glass Card
-    pub const SURFACE_HOVER: Self = Self::new(48, 55, 84);  // #303754 Hover / Active Row
-    pub const BORDER: Self = Self::new(66, 76, 112);        // #424C70 Crisp Glass Hairline
-    pub const SHADOW: Self = Self::new(5, 7, 14);           // #05070E Soft Shadow
+    // Editorial Paper & Sky Palette (Inspired by Cloud Desktop / Light Paper UI)
+    // Sky & Atmospheric Backdrop
+    pub const BG_TOP: Self = Self::new(58, 90, 140);         // #3A5A8C Deep Cerulean Sky
+    pub const BG_MID: Self = Self::new(92, 128, 178);        // #5C80B2 Soft Mid Sky
+    pub const BG_BOTTOM: Self = Self::new(150, 178, 208);    // #96B2D0 Horizon Mist
 
-    pub const TEXT_PRIMARY: Self = Self::new(244, 246, 252);// #F4F6FC Crisp White
-    pub const TEXT_MUTED: Self = Self::new(158, 169, 194);  // #9EA9C2 Soft Slate
-    pub const TEXT_DIM: Self = Self::new(105, 117, 146);    // #697592 Subtle Caption
+    // Light Editorial Paper Window Surfaces (matching crisp white + warm linen rail)
+    pub const SURFACE: Self = Self::new(255, 255, 255);      // #FFFFFF Pure Paper Window Body
+    pub const SURFACE_ALT: Self = Self::new(246, 245, 241);  // #F6F5F1 Warm Linen Titlebar / Rail
+    pub const SURFACE_CARD: Self = Self::new(241, 240, 235); // #F1F0EB Soft Stone Card
+    pub const SURFACE_HOVER: Self = Self::new(230, 228, 221);// #E6E4DD Hover / Selected Row
+    pub const BORDER: Self = Self::new(222, 220, 213);       // #DEDCD5 Crisp Hairline
+    pub const SHADOW: Self = Self::new(15, 23, 42);          // #0F172A Soft Slate Shadow
 
-    pub const ACCENT: Self = Self::new(108, 158, 255);      // #6C9EFF Soft Mac Indigo-Blue
-    pub const VIOLET: Self = Self::new(167, 139, 250);      // #A78BFA Soft Violet
-    pub const SAGE: Self = Self::new(52, 211, 153);         // #34D399 Emerald Mint
-    pub const AMBER: Self = Self::new(251, 191, 36);        // #FBBF24 Warm Amber
-    pub const CORAL: Self = Self::new(248, 113, 113);       // #F87171 Soft Coral
+    // High-Contrast Editorial Ink on Paper
+    pub const TEXT_PRIMARY: Self = Self::new(24, 24, 27);    // #18181B Matte Charcoal Ink
+    pub const TEXT_MUTED: Self = Self::new(92, 96, 108);     // #5C606C Neutral Slate
+    pub const TEXT_DIM: Self = Self::new(146, 150, 160);     // #9296A0 Subtle Caption
+
+    // Primary Obsidian CTA & Frosted Dark Glass Tokens (for Desktop Chrome over Sky)
+    pub const INK_SOLID: Self = Self::new(24, 24, 27);       // #18181B Solid Matte Black Button
+    pub const GLASS_DARK: Self = Self::new(25, 38, 58);      // #19263A Frosted Slate Glass
+    pub const GLASS_ELEVATED: Self = Self::new(40, 56, 82);  // #283852 Elevated Frosted Glass
+    pub const GLASS_TEXT: Self = Self::new(248, 250, 252);   // #F8FAFC Crisp White on Glass
+    pub const GLASS_MUTED: Self = Self::new(203, 213, 225);  // #CBD5E1 Soft Silver on Glass
+    pub const GLASS_BORDER: Self = Self::new(255, 255, 255); // Luminous Hairline (alpha-blended)
+
+    // Tasteful Muted Editorial Accents (high contrast on white paper, never neon)
+    pub const ACCENT: Self = Self::new(37, 99, 235);         // #2563EB Editorial Cobalt
+    pub const VIOLET: Self = Self::new(109, 40, 217);        // #6D28D9 Deep Indigo-Violet
+    pub const SAGE: Self = Self::new(21, 128, 61);           // #15803D Forest Emerald
+    pub const AMBER: Self = Self::new(180, 83, 9);           // #B45309 Warm Ochre
+    pub const CORAL: Self = Self::new(220, 38, 38);          // #DC2626 Editorial Crimson
 
     // macOS Traffic-Light Window Controls
     pub const TRAFFIC_RED: Self = Self::new(255, 95, 86);
@@ -43,9 +57,9 @@ impl Color {
     pub const TRAFFIC_GREEN: Self = Self::new(39, 201, 63);
 
     // Compatibility aliases for console macros
-    pub const BG_OBSIDIAN: Self = Self::BG_TOP;
-    pub const BG_PANEL: Self = Self::SURFACE;
-    pub const WHITE: Self = Self::TEXT_PRIMARY;
+    pub const BG_OBSIDIAN: Self = Self::SURFACE;
+    pub const BG_PANEL: Self = Self::SURFACE_ALT;
+    pub const WHITE: Self = Self::GLASS_TEXT;
     pub const CYAN: Self = Self::ACCENT;
     pub const EMERALD: Self = Self::SAGE;
     pub const CRIMSON: Self = Self::CORAL;
@@ -124,17 +138,235 @@ impl Framebuffer {
         }
     }
 
-    /// Draws a macOS-style frosted glass card with rounded corners and subtle 1px border.
+    /// Draws a macOS-style crisp card with rounded corners and subtle 1px hairline border.
     pub fn draw_glass_panel(&mut self, x: usize, y: usize, w: usize, h: usize, r: usize, fill: Color, border: Color) {
         self.draw_rounded_rect(x, y, w, h, r, fill, Some(border));
     }
 
+    /// Alpha-blends a filled rectangle over existing framebuffer pixels.
+    pub fn fill_rect_alpha(&mut self, x: usize, y: usize, w: usize, h: usize, color: Color, alpha: u8) {
+        let x_end = (x + w).min(self.width);
+        let y_end = (y + h).min(self.height);
+        if x >= x_end || y >= y_end || alpha == 0 {
+            return;
+        }
+        if alpha == 255 {
+            self.fill_rect(x, y, x_end - x, y_end - y, color);
+            return;
+        }
+        let a = alpha as u16;
+        let inv = 255 - a;
+        let fg_r = color.r as u16 * a;
+        let fg_g = color.g as u16 * a;
+        let fg_b = color.b as u16 * a;
+
+        for cy in y..y_end {
+            let row_start = cy * self.stride + x;
+            let count = x_end - x;
+            unsafe {
+                let ptr = self.base.add(row_start);
+                for i in 0..count {
+                    let raw = ptr.add(i).read_volatile();
+                    let bg = self.unpack_color(raw);
+                    let blended = Color::new(
+                        ((bg.r as u16 * inv + fg_r) / 255) as u8,
+                        ((bg.g as u16 * inv + fg_g) / 255) as u8,
+                        ((bg.b as u16 * inv + fg_b) / 255) as u8,
+                    );
+                    ptr.add(i).write_volatile(self.pack_color(blended));
+                }
+            }
+        }
+    }
+
+    /// Draws a true translucent frosted-glass rounded panel alpha-blended over the sky/clouds.
+    pub fn draw_frosted_glass(
+        &mut self,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+        r: usize,
+        tint: Color,
+        fill_alpha: u8,
+        border: Option<(Color, u8)>,
+    ) {
+        if w < r * 2 || h < r * 2 {
+            self.fill_rect_alpha(x, y, w, h, tint, fill_alpha);
+            return;
+        }
+        let r_sq = (r * r) as isize;
+        let r_inner_sq = ((r.saturating_sub(1)) * (r.saturating_sub(1))) as isize;
+
+        // Middle horizontal band + top/bottom center strips
+        self.fill_rect_alpha(x + 1, y + r, w.saturating_sub(2), h - 2 * r, tint, fill_alpha);
+        self.fill_rect_alpha(x + r, y + 1, w - 2 * r, r.saturating_sub(1), tint, fill_alpha);
+        self.fill_rect_alpha(x + r, y + h - r, w - 2 * r, r.saturating_sub(1), tint, fill_alpha);
+
+        // Straight border edges
+        if let Some((b_col, b_alpha)) = border {
+            self.fill_rect_alpha(x + r, y, w - 2 * r, 1, b_col, b_alpha);
+            self.fill_rect_alpha(x + r, y + h - 1, w - 2 * r, 1, b_col, b_alpha);
+            self.fill_rect_alpha(x, y + r, 1, h - 2 * r, b_col, b_alpha);
+            self.fill_rect_alpha(x + w - 1, y + r, 1, h - 2 * r, b_col, b_alpha);
+        } else {
+            self.fill_rect_alpha(x + r, y, w - 2 * r, 1, tint, fill_alpha);
+            self.fill_rect_alpha(x + r, y + h - 1, w - 2 * r, 1, tint, fill_alpha);
+            self.fill_rect_alpha(x, y + r, 1, h - 2 * r, tint, fill_alpha);
+            self.fill_rect_alpha(x + w - 1, y + r, 1, h - 2 * r, tint, fill_alpha);
+        }
+
+        // 4 Rounded corners
+        for dy in 0..r {
+            for dx in 0..r {
+                let dist_sq = ((r - 1 - dx) * (r - 1 - dx) + (r - 1 - dy) * (r - 1 - dy)) as isize;
+                if dist_sq <= r_sq {
+                    let is_edge = dist_sq >= r_inner_sq;
+                    let (col, a) = if is_edge {
+                        if let Some((b_col, b_alpha)) = border {
+                            (b_col, b_alpha)
+                        } else {
+                            (tint, fill_alpha)
+                        }
+                    } else {
+                        (tint, fill_alpha)
+                    };
+                    self.blend_pixel(x + dx, y + dy, col, a);
+                    self.blend_pixel(x + w - 1 - dx, y + dy, col, a);
+                    self.blend_pixel(x + dx, y + h - 1 - dy, col, a);
+                    self.blend_pixel(x + w - 1 - dx, y + h - 1 - dy, col, a);
+                }
+            }
+        }
+    }
+
+    /// Draws a soft feathered cloud puff (radial quadratic alpha falloff) for sky wallpaper.
+    fn draw_cloud_puff(&mut self, cx: isize, cy: isize, rx: isize, ry: isize, color: Color, peak_alpha: u8) {
+        if rx <= 0 || ry <= 0 {
+            return;
+        }
+        let x0 = (cx - rx).max(0) as usize;
+        let x1 = (cx + rx).min(self.width as isize) as usize;
+        let y0 = (cy - ry).max(0) as usize;
+        let y1 = (cy + ry).min(self.height as isize) as usize;
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
+        let rx_sq = (rx * rx) as i64;
+        let ry_sq = (ry * ry) as i64;
+        let prod = rx_sq * ry_sq;
+
+        for y in y0..y1 {
+            let dy = (y as isize - cy) as i64;
+            let dy_term = dy * dy * rx_sq;
+            let row_start = y * self.stride;
+            for x in x0..x1 {
+                let dx = (x as isize - cx) as i64;
+                let norm = dx * dx * ry_sq + dy_term;
+                if norm < prod {
+                    // Smooth quadratic falloff: (1 - r^2)^2 gives soft organic cloud edges
+                    let rem = ((prod - norm) * 255) / prod;
+                    let soft = (rem * rem) / 255;
+                    let alpha = ((soft * peak_alpha as i64) / 255) as u8;
+                    if alpha > 2 {
+                        let offset = row_start + x;
+                        let raw_bg = unsafe { self.base.add(offset).read_volatile() };
+                        let blended = Self::blend(self.unpack_color(raw_bg), color, alpha);
+                        unsafe {
+                            self.base.add(offset).write_volatile(self.pack_color(blended));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Renders the signature atmospheric cerulean sky + sunlit volumetric cumulus clouds wallpaper.
+    pub fn draw_sky_clouds_wallpaper(&mut self) {
+        let w = self.width as isize;
+        let h = self.height as isize;
+        let mid_y = (self.height * 58) / 100;
+
+        // 1. Two-stop smooth cerulean-to-horizon sky gradient
+        for y in 0..self.height {
+            let row_col = if y < mid_y {
+                let a = ((y * 255) / mid_y.max(1)) as u8;
+                Self::blend(Color::BG_TOP, Color::BG_MID, a)
+            } else {
+                let a = (((y - mid_y) * 255) / (self.height - mid_y).max(1)) as u8;
+                Self::blend(Color::BG_MID, Color::BG_BOTTOM, a)
+            };
+            let packed = self.pack_color(row_col);
+            let row_start = y * self.stride;
+            unsafe {
+                let ptr = self.base.add(row_start);
+                for x in 0..self.width {
+                    ptr.add(x).write_volatile(packed);
+                }
+            }
+        }
+
+        // 2. Back shadow cumulus layer (cool atmospheric silver-blue depth)
+        let shadow_col = Color::new(152, 168, 192);
+        let back_puffs: [(isize, isize, isize, isize, u8); 9] = [
+            (w * 4 / 100, h * 76 / 100, w * 18 / 100, h * 26 / 100, 170),
+            (w * 16 / 100, h * 84 / 100, w * 20 / 100, h * 24 / 100, 180),
+            (w * 32 / 100, h * 92 / 100, w * 22 / 100, h * 22 / 100, 165),
+            (w * 52 / 100, h * 94 / 100, w * 24 / 100, h * 20 / 100, 155),
+            (w * 72 / 100, h * 88 / 100, w * 22 / 100, h * 24 / 100, 175),
+            (w * 86 / 100, h * 72 / 100, w * 18 / 100, h * 28 / 100, 185),
+            (w * 96 / 100, h * 64 / 100, w * 16 / 100, h * 30 / 100, 190),
+            (w * 9 / 100, h * 58 / 100, w * 14 / 100, h * 20 / 100, 130),
+            (w * 89 / 100, h * 54 / 100, w * 15 / 100, h * 22 / 100, 140),
+        ];
+        for &(cx, cy, rx, ry, a) in &back_puffs {
+            self.draw_cloud_puff(cx, cy, rx, ry, shadow_col, a);
+        }
+
+        // 3. Mid volumetric cloud body (soft alabaster-silver)
+        let mid_col = Color::new(220, 227, 236);
+        let mid_puffs: [(isize, isize, isize, isize, u8); 12] = [
+            (w * 2 / 100, h * 66 / 100, w * 13 / 100, h * 19 / 100, 210),
+            (w * 11 / 100, h * 76 / 100, w * 15 / 100, h * 22 / 100, 220),
+            (w * 22 / 100, h * 86 / 100, w * 16 / 100, h * 20 / 100, 215),
+            (w * 37 / 100, h * 93 / 100, w * 18 / 100, h * 18 / 100, 200),
+            (w * 54 / 100, h * 95 / 100, w * 19 / 100, h * 17 / 100, 195),
+            (w * 69 / 100, h * 90 / 100, w * 17 / 100, h * 20 / 100, 210),
+            (w * 80 / 100, h * 80 / 100, w * 16 / 100, h * 22 / 100, 220),
+            (w * 90 / 100, h * 68 / 100, w * 15 / 100, h * 23 / 100, 225),
+            (w * 97 / 100, h * 58 / 100, w * 13 / 100, h * 21 / 100, 215),
+            (w * 6 / 100, h * 56 / 100, w * 10 / 100, h * 15 / 100, 185),
+            (w * 86 / 100, h * 56 / 100, w * 11 / 100, h * 16 / 100, 190),
+            (w * 94 / 100, h * 84 / 100, w * 16 / 100, h * 22 / 100, 220),
+        ];
+        for &(cx, cy, rx, ry, a) in &mid_puffs {
+            self.draw_cloud_puff(cx, cy, rx, ry, mid_col, a);
+        }
+
+        // 4. Bright sunlit cloud crowns (crisp warm white highlights on top-left rims)
+        let sun_col = Color::new(247, 249, 252);
+        let sun_puffs: [(isize, isize, isize, isize, u8); 9] = [
+            (w * 4 / 100, h * 56 / 100, w * 8 / 100, h * 12 / 100, 210),
+            (w * 11 / 100, h * 68 / 100, w * 10 / 100, h * 14 / 100, 220),
+            (w * 20 / 100, h * 80 / 100, w * 11 / 100, h * 13 / 100, 200),
+            (w * 35 / 100, h * 89 / 100, w * 12 / 100, h * 11 / 100, 175),
+            (w * 68 / 100, h * 86 / 100, w * 11 / 100, h * 12 / 100, 190),
+            (w * 80 / 100, h * 72 / 100, w * 11 / 100, h * 15 / 100, 215),
+            (w * 88 / 100, h * 57 / 100, w * 10 / 100, h * 14 / 100, 225),
+            (w * 95 / 100, h * 50 / 100, w * 9 / 100, h * 13 / 100, 205),
+            (w * 91 / 100, h * 76 / 100, w * 12 / 100, h * 15 / 100, 210),
+        ];
+        for &(cx, cy, rx, ry, a) in &sun_puffs {
+            self.draw_cloud_puff(cx, cy, rx, ry, sun_col, a);
+        }
+    }
+
     /// Draws a macOS/iOS pill toggle switch (40x22) at `(x, y)`.
     pub fn draw_toggle_switch(&mut self, x: usize, y: usize, on: bool, active_col: Color) {
-        let track_col = if on { active_col } else { Color::SURFACE_HOVER };
-        self.draw_rounded_rect(x, y, 40, 22, 11, track_col, Some(Color::BORDER));
+        let track_col = if on { active_col } else { Color::BORDER };
+        self.draw_rounded_rect(x, y, 40, 22, 11, track_col, None);
         let knob_x = if on { x + 20 } else { x + 2 };
-        self.draw_rounded_rect(knob_x, y + 2, 18, 18, 9, Color::TEXT_PRIMARY, None);
+        self.draw_rounded_rect(knob_x, y + 2, 18, 18, 9, Color::SURFACE, None);
     }
 
     #[inline(always)]
@@ -253,21 +485,28 @@ impl Framebuffer {
         }
     }
 
-    /// Draws a soft drop shadow behind a floating rounded window.
+    /// Draws a soft, diffused macOS-style elevation shadow behind a floating rounded window.
     pub fn draw_shadow(&mut self, x: usize, y: usize, w: usize, h: usize, r: usize) {
         for layer in (1..=6).rev() {
-            let alpha = (7 - layer) as u8 * 14;
-            let sx = x.saturating_sub(layer / 2);
-            let sy = y + layer * 2;
-            let sw = w + layer;
-            let sh = h + layer;
+            let alpha = (7 - layer) as u8 * 7;
+            let spread = layer * 2;
+            let sx = x.saturating_sub(spread);
+            let sy = y + layer;
+            let sw = w + spread * 2;
+            let sh = h + spread;
             let x_end = (sx + sw).min(self.width);
             let y_end = (sy + sh).min(self.height);
-            // Fast soft shadow on bottom and right edges
-            for py in (y + h.saturating_sub(r))..y_end {
-                for px in sx..x_end {
-                    self.blend_pixel(px, py, Color::SHADOW, alpha);
-                }
+            // Bottom diffused shadow strip
+            let bot_y0 = (y + h.saturating_sub(r / 2)).min(y_end);
+            self.fill_rect_alpha(sx + r / 2, bot_y0, x_end.saturating_sub(sx + r), y_end.saturating_sub(bot_y0), Color::SHADOW, alpha);
+            // Subtle side halo strips
+            let side_y0 = (y + r).min(bot_y0);
+            let side_h = bot_y0.saturating_sub(side_y0);
+            if side_h > 0 && x > sx {
+                self.fill_rect_alpha(sx, side_y0, x - sx, side_h, Color::SHADOW, alpha / 2);
+            }
+            if side_h > 0 && x_end > x + w {
+                self.fill_rect_alpha(x + w, side_y0, x_end - (x + w), side_h, Color::SHADOW, alpha / 2);
             }
         }
     }

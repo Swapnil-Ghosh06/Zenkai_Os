@@ -11,7 +11,7 @@ use uefi::proto::console::text::{Key, ScanCode};
 use uefi::runtime::{self, ResetType};
 use uefi::Status;
 
-use crate::font_aa::{UI_HEADING, UI_SANS, WORDMARK_H};
+use crate::font_aa::{UI_SANS, WORDMARK_H};
 use crate::gop::{Color, Framebuffer};
 use crate::hw::HardwareInfo;
 use crate::kok;
@@ -47,17 +47,17 @@ fn draw_boot_menu(
     card_x: usize,
     card_y: usize,
 ) {
-    fb.fill_gradient(Color::BG_TOP, Color::BG_BOTTOM);
-    fb.draw_wordmark(wm_y, Color::TEXT_PRIMARY);
+    fb.draw_sky_clouds_wallpaper();
+    fb.draw_wordmark(wm_y, Color::GLASS_TEXT);
 
-    let sub = "Swapnil Ghosh  -  25BTRCL267 AIML-E  |  macOS Glass Dark";
+    let sub = "Zenkai OS v1.0 Desktop Edition  |  Swapnil Ghosh (25BTRCL267 AIML-E)";
     let sub_w = UI_SANS.text_width(sub);
     let sub_x = fb.width.saturating_sub(sub_w) / 2;
-    fb.draw_aa_text(sub_x, wm_y + WORDMARK_H + 6, &UI_SANS, sub, Color::TEXT_MUTED, None);
+    fb.draw_aa_text(sub_x, wm_y + WORDMARK_H + 6, &UI_SANS, sub, Color::GLASS_TEXT, None);
 
     let card_h = CARD_PAD * 2 + MENU_ITEMS.len() * ITEM_H + 12;
-    fb.draw_shadow(card_x, card_y, CARD_W, card_h, 16);
-    fb.draw_glass_panel(card_x, card_y, CARD_W, card_h, 16, Color::SURFACE, Color::BORDER);
+    fb.draw_shadow(card_x, card_y, CARD_W, card_h, 14);
+    fb.draw_glass_panel(card_x, card_y, CARD_W, card_h, 14, Color::SURFACE, Color::BORDER);
 
     // Subtle macOS traffic-light dots on boot card header
     fb.draw_rounded_rect(card_x + 16, card_y + 12, 10, 10, 5, Color::TRAFFIC_RED, None);
@@ -72,16 +72,17 @@ fn draw_boot_menu(
         let is_sel = idx == selected;
 
         if is_sel {
-            fb.draw_rounded_rect(rx, ry, rw, ITEM_H - 4, 10, Color::SURFACE_HOVER, Some(Color::ACCENT));
+            fb.draw_rounded_rect(rx, ry, rw, ITEM_H - 4, 9, Color::INK_SOLID, None);
         }
 
-        let text_col = if is_sel { Color::TEXT_PRIMARY } else { Color::TEXT_MUTED };
+        let text_col = if is_sel { Color::GLASS_TEXT } else { Color::TEXT_PRIMARY };
         fb.draw_aa_text(rx + 16, ry + 7, &UI_SANS, label, text_col, None);
 
         if idx == 0 {
             let tag = "Default";
             let tw = UI_SANS.text_width(tag);
-            fb.draw_aa_text(rx + rw - tw - 16, ry + 7, &UI_SANS, tag, Color::ACCENT, None);
+            let tag_col = if is_sel { Color::GLASS_MUTED } else { Color::TEXT_MUTED };
+            fb.draw_aa_text(rx + rw - tw - 16, ry + 7, &UI_SANS, tag, tag_col, None);
         } else if idx == 3 {
             fb.draw_toggle_switch(rx + rw - 56, ry + 7, debug_on, Color::SAGE);
         }
@@ -93,7 +94,8 @@ fn draw_boot_menu(
     };
     let hw_txt = UI_SANS.text_width(&hint);
     let hx = fb.width.saturating_sub(hw_txt) / 2;
-    fb.draw_aa_text(hx, card_y + card_h + 18, &UI_SANS, &hint, Color::TEXT_DIM, None);
+    fb.draw_frosted_glass(hx.saturating_sub(14), card_y + card_h + 14, hw_txt + 28, 28, 9, Color::GLASS_DARK, 165, None);
+    fb.draw_aa_text(hx, card_y + card_h + 16, &UI_SANS, &hint, Color::GLASS_TEXT, None);
 }
 
 pub fn run_visual_boot_sequence(fb: &mut Framebuffer, hw: &mut HardwareInfo) -> BootAction {
@@ -222,36 +224,52 @@ pub fn run_visual_boot_sequence(fb: &mut Framebuffer, hw: &mut HardwareInfo) -> 
     fb.draw_wordmark(splash_wm_y, Color::TEXT_PRIMARY);
 
     let mode_label = match action {
-        BootAction::Normal => "Starting Zenkai OS  -  Swapnil Ghosh (25BTRCL267 AIML-E)",
+        BootAction::Normal => "Zenkai OS v1.0 Desktop Edition  -  Swapnil Ghosh (25BTRCL267 AIML-E)",
         BootAction::Recovery => "Starting Recovery Diagnostics  -  Swapnil Ghosh",
         BootAction::FirmwareShell => "Opening Zenkai Firmware Shell  -  Swapnil Ghosh",
     };
-    let mw = UI_HEADING.text_width(mode_label);
+    let mw = UI_SANS.text_width(mode_label);
     fb.draw_aa_text(fb.width.saturating_sub(mw) / 2, splash_wm_y + WORDMARK_H + 8, &UI_SANS, mode_label, Color::TEXT_MUTED, None);
 
-    let bar_w = 260usize;
-    let bar_h = 5usize;
+    let bar_w = 320usize;
+    let bar_h = 6usize;
     let bar_x = fb.width.saturating_sub(bar_w) / 2;
     let bar_y = splash_wm_y + WORDMARK_H + 46;
-    fb.draw_rounded_rect(bar_x, bar_y, bar_w, bar_h, 2, Color::SURFACE_ALT, None);
+    fb.draw_rounded_rect(bar_x, bar_y, bar_w, bar_h, 3, Color::SURFACE_ALT, None);
 
     let stages = [
-        (20, "GOP Video & Laptop Probe", 120u64),
-        (40, "Memory & SpinLock Init", 120),
-        (60, "Network (WiFi & LAN)", 120),
-        (80, "Aptitude & Snapstore", 120),
-        (100, "R19 AI/ML Research Engine", 140),
+        (20, "GOP Video & Hardware Probe", 120u64),
+        (40, "Memory Allocator & SpinLock Init", 120),
+        (60, "Live Wi-Fi & Ethernet Network Stack", 120),
+        (80, "APT/Snapstore & Virtual Filesystem", 120),
+        (100, "R19 AI/ML Engine & Zenkai Desktop", 140),
     ];
+
+    let pill_w = 400usize.min(fb.width.saturating_sub(40));
+    let pill_x = fb.width.saturating_sub(pill_w) / 2;
+    let pill_y = bar_y + 18;
 
     let mut prev_fill = 0usize;
     for &(pct, stage_name, stall_ms) in &stages {
+        fb.draw_rounded_rect(pill_x, pill_y, pill_w, 28, 8, Color::SURFACE, Some(Color::BORDER));
+        let st_txt = format!("[{:>3}%]  Loading {}...", pct, stage_name);
+        let st_w = UI_SANS.text_width(&st_txt);
+        fb.draw_aa_text(
+            pill_x + pill_w.saturating_sub(st_w) / 2,
+            pill_y + 2,
+            &UI_SANS,
+            &st_txt,
+            Color::ACCENT,
+            None,
+        );
+
         let stage_tsc = read_tsc();
         let target_fill = (bar_w * pct) / 100;
         let steps = 4usize;
         for s in 1..=steps {
             let cur_fill = prev_fill + ((target_fill - prev_fill) * s) / steps;
             if cur_fill >= 4 {
-                fb.draw_rounded_rect(bar_x, bar_y, cur_fill, bar_h, 2, Color::ACCENT, None);
+                fb.draw_rounded_rect(bar_x, bar_y, cur_fill, bar_h, 3, Color::ACCENT, None);
             }
             sleep_ms((stall_ms / steps as u64) as usize);
         }

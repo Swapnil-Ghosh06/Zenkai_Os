@@ -5,21 +5,26 @@ use alloc::string::String;
 use crate::pkg::WifiNetwork;
 
 pub fn default_wifi_ip() -> &'static str {
-    "172.16.0.50/24"
+    "172.20.217.17/24"
 }
 
 pub fn default_gateway_ip() -> &'static str {
-    "172.16.0.1"
+    "172.20.192.1"
 }
 
 pub fn default_base_ping_tenths_ms() -> u32 {
-    242
+    152
 }
 
 pub fn default_scanned_networks() -> Vec<WifiNetwork> {
     let mut nets = Vec::new();
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-B-F3"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 74, connected: true });
-    nets.push(WifiNetwork { ssid: String::from("realme 14 Pro+ 5G C814"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 56, connected: false });
-    nets.push(WifiNetwork { ssid: String::from("MOJO-JAN-C1-F6"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 20, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Student"), band: String::from("5 GHz"), security: String::from("Open"), signal_pct: 99, connected: true });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Guest"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Student (2.4G)"), band: String::from("2.4 GHz"), security: String::from("Open"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Guest (5G)"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Employee"), band: String::from("2.4 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Employee (5G)"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 99, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Jain_Hackathon"), band: String::from("5 GHz"), security: String::from("WPA3/WPA2-PSK"), signal_pct: 38, connected: false });
+    nets.push(WifiNetwork { ssid: String::from("Recover.Me-3809E0"), band: String::from("5 GHz"), security: String::from("WPA2-PSK"), signal_pct: 20, connected: false });
     nets
 }
