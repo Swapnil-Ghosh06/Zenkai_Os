@@ -588,23 +588,27 @@ impl Desktop {
             return;
         }
 
-        // Top Bar: Control Center Toggle Button
+        // Top Bar: Control Center Toggle Button + Clock pill
         let (ccbx, ccby, ccbw, ccbh) = Self::cc_button_bounds(w);
-        if mouse.in_rect(ccbx, ccby, ccbw, ccbh) {
+        let clock_w = 82usize;
+        let clock_x = w.saturating_sub(clock_w + 10);
+        if mouse.in_rect(ccbx, ccby, ccbw, ccbh) || mouse.in_rect(clock_x, 4, clock_w, 24) {
             self.control_center_open = !self.control_center_open;
             self.start_menu_open = false;
             self.needs_full_redraw = true;
             return;
         }
 
-        // Top Bar: Wi-Fi pill shortcut -> Network tab
-        let lan_x = ccbx.saturating_sub(72);
-        let wifi_x = lan_x.saturating_sub(84);
-        if mouse.in_rect(wifi_x, 5, 76, 24) {
+        // Top Bar: Wi-Fi & LAN pills -> Network tab (exact match to draw_top_bar)
+        let lan_w = 60usize;
+        let lan_x = ccbx.saturating_sub(lan_w + 8);
+        let wifi_w = 72usize;
+        let wifi_x = lan_x.saturating_sub(wifi_w + 8);
+        if mouse.in_rect(wifi_x, 4, wifi_w, 24) {
             self.switch_tab(DesktopTab::Network);
             return;
         }
-        if mouse.in_rect(lan_x, 5, 64, 24) {
+        if mouse.in_rect(lan_x, 4, lan_w, 24) {
             self.switch_tab(DesktopTab::Network);
             return;
         }
@@ -730,6 +734,26 @@ impl Desktop {
                 if mouse.in_rect(ix, iy, cell_w - 8, cell_h - 6) {
                     self.home_cursor = idx;
                     self.launch_shortcut(idx);
+                    return;
+                }
+            }
+
+            if let Some((wx, wy, ww)) = Self::right_widget_column(w) {
+                let tile_w = (ww.saturating_sub(12)) / 2;
+                let tile_h = 96usize;
+                // Top-left UPTIME tile -> System Monitor
+                if mouse.in_rect(wx, wy, tile_w, tile_h) {
+                    self.switch_tab(DesktopTab::System);
+                    return;
+                }
+                // Top-right NETWORK tile -> Network Manager
+                if mouse.in_rect(wx + tile_w + 12, wy, tile_w, tile_h) {
+                    self.switch_tab(DesktopTab::Network);
+                    return;
+                }
+                // Middle Zenkai OS v1.0 overview card -> System Monitor
+                if mouse.in_rect(wx, wy + tile_h + 14, ww, 178) {
+                    self.switch_tab(DesktopTab::System);
                     return;
                 }
             }

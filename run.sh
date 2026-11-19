@@ -84,7 +84,8 @@ case "$BUILD_MODE" in
         echo -e "\x1b[32m[*] Running in Cocoa GUI Window Mode with Serial Console in Terminal...\x1b[0m"
         "$QEMU_BIN" \
             -machine q35 \
-            -m 256M \
+            -m 512M \
+            -vga std \
             -drive if=pflash,format=raw,readonly=on,file="$OVMF_PATH" \
             -drive format=raw,file=fat:rw:"$ESP_DIR" \
             -serial stdio \
